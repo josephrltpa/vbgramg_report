@@ -21,7 +21,9 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
 
   async function loadJobCards() {
     setLoading(true);
+    console.log('[JCList] Loading job cards for village:', village);
     const data = await fetchJobCards(village);
+    console.log('[JCList] Received data:', data.length, 'cards');
     setJobCards(data);
     setLoading(false);
   }

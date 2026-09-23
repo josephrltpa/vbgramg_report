@@ -5,12 +5,28 @@ import { JobCard, JCRequest, MonthlyDemand, RequestStatus, CreditStatus } from '
 // JOB CARDS (Fixed list)
 // ============================================================================
 export async function fetchJobCards(village?: string): Promise<JobCard[]> {
-  let query = supabase.from('job_cards').select('*').eq('is_active', true);
+  console.log('[Supabase] Fetching job cards for village:', village);
+  
+  let query = supabase.from('job_cards').select('*');
+  
+  // Only filter by village if it's a specific village (not 'all')
   if (village && village !== 'all') {
     query = query.eq('village', village);
   }
-  const { data, error } = await query.order('head_name');
-  if (error) { console.error('Error fetching job cards:', error); return []; }
+  
+  // Show all cards (including inactive for now)
+  query = query.order('head_name');
+
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('[Supabase] Error fetching job cards:', error);
+    return [];
+  }
+  
+  console.log('[Supabase] Job cards fetched:', data?.length || 0, 'records');
+  console.log('[Supabase] Sample data:', data?.slice(0, 2));
+  
   return (data || []).map((row: any) => ({
     id: row.id,
     jobCardNumber: row.job_card_number,
