@@ -78,6 +78,18 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     await loadData();
   }
 
+  async function handleMarkAllCredited() {
+    const pendingDemands = demands.filter(d => d.creditStatus === 'Pending');
+    const creditDate = new Date().toISOString().split('T')[0];
+    
+    // Update all pending demands to credited
+    for (const demand of pendingDemands) {
+      await updateDemandCreditStatus(demand.id, 'Credited', creditDate);
+    }
+    
+    await loadData();
+  }
+
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -201,6 +213,24 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
           <p className="text-xl font-bold text-amber-900">{pendingCount}</p>
         </div>
       </div>
+
+      {/* Bulk Actions for Admin */}
+      {userRole === 'computer_assistant' && pendingCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-amber-900">Bulk Actions</p>
+              <p className="text-xs text-amber-700">{pendingCount} demands pending credit status</p>
+            </div>
+            <button
+              onClick={handleMarkAllCredited}
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+            >
+              Mark All as Credited
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Add Member Panel */}
       {showAddPanel && (
@@ -516,17 +546,30 @@ function DemandRow({
       <td className="px-4 py-3 text-gray-700">{demand.daysWorked}</td>
       <td className="px-4 py-3 font-semibold text-gray-800">{formatAmount(demand.wageAmount)}</td>
       <td className="px-4 py-3">
-        <button
-          onClick={() => onToggleCredit(demand)}
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold min-h-[32px] ${
-            demand.creditStatus === 'Credited'
-              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-              : 'bg-amber-100 text-amber-700 border border-amber-200'
-          }`}
-        >
-          {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-          {demand.creditStatus}
-        </button>
+        {userRole === 'computer_assistant' ? (
+          <button
+            onClick={() => onToggleCredit(demand)}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold min-h-[32px] ${
+              demand.creditStatus === 'Credited'
+                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                : 'bg-amber-100 text-amber-700 border border-amber-200'
+            }`}
+          >
+            {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+            {demand.creditStatus}
+          </button>
+        ) : (
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+              demand.creditStatus === 'Credited'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+            {demand.creditStatus}
+          </span>
+        )}
       </td>
       <td className="px-4 py-3">
         {editingLink ? (
@@ -610,17 +653,30 @@ function DemandCard({
           <h4 className="text-sm font-semibold text-gray-900 mt-1">{demand.headName}</h4>
           <p className="text-sm font-bold text-gray-800 mt-1">{formatAmount(demand.wageAmount)}</p>
         </div>
-        <button
-          onClick={() => onToggleCredit(demand)}
-          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
-            demand.creditStatus === 'Credited'
-              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-              : 'bg-amber-100 text-amber-700 border border-amber-200'
-          }`}
-        >
-          {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-          {demand.creditStatus}
-        </button>
+        {userRole === 'computer_assistant' ? (
+          <button
+            onClick={() => onToggleCredit(demand)}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+              demand.creditStatus === 'Credited'
+                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                : 'bg-amber-100 text-amber-700 border border-amber-200'
+            }`}
+          >
+            {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+            {demand.creditStatus}
+          </button>
+        ) : (
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+              demand.creditStatus === 'Credited'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-amber-100 text-amber-700'
+            }`}
+          >
+            {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+            {demand.creditStatus}
+          </span>
+        )}
       </div>
 
       <button
