@@ -6,6 +6,12 @@ import { JobCard, JCRequest, MonthlyDemand, RequestStatus, CreditStatus } from '
 // ============================================================================
 export async function fetchJobCards(village?: string): Promise<JobCard[]> {
   console.log('[Supabase] Fetching job cards for village:', village);
+  console.log('[Supabase] Client URL:', (supabase as any).supabaseUrl);
+  
+  // Test: fetch ALL records without any filter
+  const { data: testAll, error: testError } = await supabase.from('job_cards').select('id, village, head_name').limit(5);
+  console.log('[Supabase] TEST - All records:', testAll?.length || 0, 'Error:', testError);
+  console.log('[Supabase] TEST - Raw data:', JSON.stringify(testAll));
   
   let query = supabase.from('job_cards').select('*');
   
@@ -21,6 +27,7 @@ export async function fetchJobCards(village?: string): Promise<JobCard[]> {
   
   if (error) {
     console.error('[Supabase] Error fetching job cards:', error);
+    console.error('[Supabase] Error details:', JSON.stringify(error));
     return [];
   }
   

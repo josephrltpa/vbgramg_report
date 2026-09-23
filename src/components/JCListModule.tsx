@@ -70,6 +70,12 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
           <h3 className="text-lg font-bold text-gray-900">Job Card List</h3>
           <p className="text-xs text-gray-500">{village} • {jobCards.length} cards</p>
         </div>
+        <button
+          onClick={loadJobCards}
+          className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-xs font-medium min-h-[40px]"
+        >
+          🔄 Reload
+        </button>
         {userRole === 'computer_assistant' && (
           <button
             onClick={() => setShowAddForm(!showAddForm)}
