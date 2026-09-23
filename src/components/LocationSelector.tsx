@@ -80,15 +80,15 @@ export default function LocationSelector({
       {/* District Selector */}
       <div>
         <label className="text-xs font-medium text-gray-600 mb-1 block">District</label>
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5 shadow-sm">
-          <MapPin className="w-4 h-4 text-indigo-600 shrink-0" />
+        <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2 py-1.5 shadow-sm">
+          <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
           <select
             value={selectedDistrict}
             onChange={(e) => {
               const district = districts.find(d => d.id === e.target.value);
               onDistrictChange(e.target.value, district?.name || '');
             }}
-            className="flex-1 bg-transparent text-sm font-medium text-gray-800 appearance-none outline-none cursor-pointer min-h-[28px]"
+            className="flex-1 bg-transparent text-xs font-medium text-gray-800 appearance-none outline-none cursor-pointer min-h-[24px]"
             disabled={loading}
           >
             <option value="">Select District</option>
@@ -104,15 +104,15 @@ export default function LocationSelector({
       {/* Block Selector */}
       <div>
         <label className="text-xs font-medium text-gray-600 mb-1 block">Block</label>
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5 shadow-sm">
-          <MapPin className="w-4 h-4 text-indigo-600 shrink-0" />
+        <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2 py-1.5 shadow-sm">
+          <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
           <select
             value={selectedBlock}
             onChange={(e) => {
               const block = blocks.find(b => b.id === e.target.value);
               onBlockChange(e.target.value, block?.name || '');
             }}
-            className="flex-1 bg-transparent text-sm font-medium text-gray-800 appearance-none outline-none cursor-pointer min-h-[28px]"
+            className="flex-1 bg-transparent text-xs font-medium text-gray-800 appearance-none outline-none cursor-pointer min-h-[24px]"
             disabled={!selectedDistrict || loading}
           >
             <option value="">Select Block</option>
@@ -128,12 +128,12 @@ export default function LocationSelector({
       {/* Village Selector */}
       <div>
         <label className="text-xs font-medium text-gray-600 mb-1 block">Village</label>
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5 shadow-sm">
-          <MapPin className="w-4 h-4 text-indigo-600 shrink-0" />
+        <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-lg px-2 py-1.5 shadow-sm">
+          <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
           <select
             value={selectedVillage}
             onChange={(e) => onVillageChange(e.target.value)}
-            className="flex-1 bg-transparent text-sm font-medium text-gray-800 appearance-none outline-none cursor-pointer min-h-[28px]"
+            className="flex-1 bg-transparent text-xs font-medium text-gray-800 appearance-none outline-none cursor-pointer min-h-[24px]"
             disabled={!selectedBlock || loading}
           >
             <option value="">Select Village</option>
