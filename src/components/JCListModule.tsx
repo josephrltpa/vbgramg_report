@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, FileText, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, FileText, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
 import { JobCard, JCRequest } from '../types';
-import { fetchJobCards, addJobCard } from '../lib/services';
+import { fetchJobCards, addJobCard, updateJobCardStatus, deleteJobCard } from '../lib/services';
 
 interface JCListModuleProps {
   village: string;
@@ -59,6 +59,25 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
       }]);
       setNewJC({ jobCardNumber: '', headName: '' });
       setShowAddForm(false);
+    }
+  }
+
+  async function handleToggleStatus(id: string, currentStatus: boolean) {
+    const success = await updateJobCardStatus(id, !currentStatus);
+    if (success) {
+      setJobCards(prev => prev.map(jc => 
+        jc.id === id ? { ...jc, isActive: !currentStatus } : jc
+      ));
+    }
+  }
+
+  async function handleDeleteJC(id: string) {
+    if (!confirm('Are you sure you want to delete this job card? This action cannot be undone.')) {
+      return;
+    }
+    const success = await deleteJobCard(id);
+    if (success) {
+      setJobCards(prev => prev.filter(jc => jc.id !== id));
     }
   }
 
@@ -164,6 +183,9 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">JC Number</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Name</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
+              {userRole === 'computer_assistant' && (
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Actions</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -173,10 +195,47 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
                 <td className="px-4 py-3 font-mono text-xs text-gray-700">{jc.jobCardNumber}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{jc.headName}</td>
                 <td className="px-4 py-3">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                    <CheckCircle2 className="w-3 h-3" /> Active
-                  </span>
+                  {userRole === 'computer_assistant' ? (
+                    <button
+                      onClick={() => handleToggleStatus(jc.id, jc.isActive)}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity ${
+                        jc.isActive 
+                          ? 'bg-emerald-100 text-emerald-700' 
+                          : 'bg-gray-100 text-gray-600'
+                      }`}
+                      title="Click to toggle status"
+                    >
+                      {jc.isActive ? (
+                        <><CheckCircle2 className="w-3 h-3" /> Active</>
+                      ) : (
+                        <><XCircle className="w-3 h-3" /> Inactive</>
+                      )}
+                    </button>
+                  ) : (
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                      jc.isActive 
+                        ? 'bg-emerald-100 text-emerald-700' 
+                        : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {jc.isActive ? (
+                        <><CheckCircle2 className="w-3 h-3" /> Active</>
+                      ) : (
+                        <><XCircle className="w-3 h-3" /> Inactive</>
+                      )}
+                    </span>
+                  )}
                 </td>
+                {userRole === 'computer_assistant' && (
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => handleDeleteJC(jc.id)}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                      title="Delete job card"
+                    >
+                      <Trash2 className="w-3 h-3" /> Delete
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -187,15 +246,50 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
       <div className="md:hidden space-y-2">
         {paginatedCards.map((jc, idx) => (
           <div key={jc.id} className="bg-white rounded-xl border border-gray-100 p-4">
-            <div className="flex items-start justify-between">
+            <div className="flex items-start justify-between mb-2">
               <div>
                 <p className="text-xs text-gray-400 font-mono">#{startIndex + idx + 1} • {jc.jobCardNumber}</p>
                 <h4 className="text-sm font-semibold text-gray-900 mt-1">{jc.headName}</h4>
               </div>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
-                <CheckCircle2 className="w-3 h-3" /> Active
-              </span>
+              {userRole === 'computer_assistant' ? (
+                <button
+                  onClick={() => handleToggleStatus(jc.id, jc.isActive)}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
+                    jc.isActive 
+                      ? 'bg-emerald-100 text-emerald-700' 
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {jc.isActive ? (
+                    <><CheckCircle2 className="w-3 h-3" /> Active</>
+                  ) : (
+                    <><XCircle className="w-3 h-3" /> Inactive</>
+                  )}
+                </button>
+              ) : (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                  jc.isActive 
+                    ? 'bg-emerald-100 text-emerald-700' 
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {jc.isActive ? (
+                    <><CheckCircle2 className="w-3 h-3" /> Active</>
+                  ) : (
+                    <><XCircle className="w-3 h-3" /> Inactive</>
+                  )}
+                </span>
+              )}
             </div>
+            {userRole === 'computer_assistant' && (
+              <div className="flex justify-end pt-2 border-t border-gray-100">
+                <button
+                  onClick={() => handleDeleteJC(jc.id)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" /> Delete
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

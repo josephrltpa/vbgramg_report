@@ -20,8 +20,8 @@ export async function fetchJobCards(village?: string): Promise<JobCard[]> {
     query = query.eq('village', village);
   }
   
-  // Show all cards (including inactive for now)
-  query = query.order('head_name');
+  // Show all cards (both active and inactive)
+  query = query.order('job_card_number');
 
   const { data, error } = await query;
   
@@ -53,6 +53,24 @@ export async function addJobCard(jc: Omit<JobCard, 'id' | 'createdAt'>) {
   }).select().single();
   if (error) { console.error('Error adding job card:', error); return null; }
   return data;
+}
+
+export async function updateJobCardStatus(id: string, isActive: boolean) {
+  const { error } = await supabase
+    .from('job_cards')
+    .update({ is_active: isActive })
+    .eq('id', id);
+  if (error) console.error('Error updating JC status:', error);
+  return !error;
+}
+
+export async function deleteJobCard(id: string) {
+  const { error } = await supabase
+    .from('job_cards')
+    .delete()
+    .eq('id', id);
+  if (error) console.error('Error deleting job card:', error);
+  return !error;
 }
 
 // ============================================================================
