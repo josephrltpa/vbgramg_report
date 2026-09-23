@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Search, Plus, Download, FileSpreadsheet } from 'lucide-react';
 import { JobCardRecord, ApprovalStatus, OfficeAction } from '../types';
 import { VILLAGES } from '../data/mockData';
+import { addJobCard, updateJobCardStatus } from '../lib/services';
 import VillageSelector from './VillageSelector';
 import JobCardMobileCard from './JobCardMobileCard';
 import AddJobCardModal from './AddJobCardModal';
@@ -34,7 +35,8 @@ export default function JobCardModule({ records, setRecords }: JobCardModuleProp
     return filtered;
   }, [records, selectedVillage, searchQuery]);
 
-  const handleStatusToggle = (id: string, field: 'approvalStatus' | 'officeAction', value: string) => {
+  const handleStatusToggle = async (id: string, field: 'approvalStatus' | 'officeAction', value: string) => {
+    // Update local state immediately for instant feedback
     setRecords((prev: JobCardRecord[]) =>
       prev.map((r) =>
         r.id === id
@@ -42,9 +44,16 @@ export default function JobCardModule({ records, setRecords }: JobCardModuleProp
           : r
       )
     );
+
+    // Save to Supabase
+    try {
+      await updateJobCardStatus(id, field, value);
+    } catch (error) {
+      console.error('Failed to save to Supabase:', error);
+    }
   };
 
-  const handleAddRecord = (data: {
+  const handleAddRecord = async (data: {
     jobCardNumber: string;
     headName: string;
     remarks: 'Add New' | 'Delete' | 'Correction';
@@ -59,7 +68,16 @@ export default function JobCardModule({ records, setRecords }: JobCardModuleProp
       ...data,
       createdAt: new Date().toISOString(),
     };
+
+    // Update local state immediately
     setRecords((prev: JobCardRecord[]) => [newRecord, ...prev]);
+
+    // Save to Supabase
+    try {
+      await addJobCard(newRecord);
+    } catch (error) {
+      console.error('Failed to save to Supabase:', error);
+    }
   };
 
   const exportCSV = () => {

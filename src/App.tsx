@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, TrendingUp, Menu, X } from 'lucide-react';
+import { ClipboardList, TrendingUp, Menu, X, Loader2, AlertCircle } from 'lucide-react';
 import { JobCardRecord, FinancialRecord } from './types';
 import { generateMockJobCards, generateMockFinancialRecords } from './data/mockData';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { fetchJobCards, fetchFinancialRecords, addJobCard, updateJobCardStatus, addFinancialRecord, updateFinancialRecordStatus } from './lib/services';
 import JobCardModule from './components/JobCardModule';
 import FinancialTrackerModule from './components/FinancialTrackerModule';
 
@@ -11,29 +12,108 @@ type Module = 'jobcards' | 'financial';
 function App() {
   const [activeModule, setActiveModule] = useState<Module>('jobcards');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
-  const [jobCards, setJobCards] = useLocalStorage<JobCardRecord[]>(
-    'mgnrega-jobcards',
-    generateMockJobCards()
-  );
+  // Local state for data (will be synced with Supabase)
+  const [jobCards, setJobCards] = useLocalStorage<JobCardRecord[]>('mgnrega-jobcards', []);
+  const [financialRecords, setFinancialRecords] = useLocalStorage<FinancialRecord[]>('mgnrega-financial', []);
 
-  const [financialRecords, setFinancialRecords] = useLocalStorage<FinancialRecord[]>(
-    'mgnrega-financial',
-    generateMockFinancialRecords()
-  );
-
-  // Initialize mock data on first load
+  // Load data from Supabase on startup
   useEffect(() => {
-    if (jobCards.length === 0) {
-      setJobCards(generateMockJobCards());
+    async function loadData() {
+      try {
+        setLoading(true);
+        setConnectionError(null);
+
+        // Try to fetch from Supabase
+        const [jcData, frData] = await Promise.all([
+          fetchJobCards(),
+          fetchFinancialRecords()
+        ]);
+
+        // If we got data from Supabase, use it
+        if (jcData.length > 0 || frData.length > 0) {
+          setJobCards(jcData);
+          setFinancialRecords(frData);
+        } else {
+          // No data in Supabase yet, use mock data
+          const mockJC = generateMockJobCards();
+          const mockFR = generateMockFinancialRecords();
+          setJobCards(mockJC);
+          setFinancialRecords(mockFR);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        setConnectionError('Could not connect to database. Using local data instead.');
+        
+        // Fall back to mock data
+        if (jobCards.length === 0) {
+          setJobCards(generateMockJobCards());
+        }
+        if (financialRecords.length === 0) {
+          setFinancialRecords(generateMockFinancialRecords());
+        }
+      } finally {
+        setLoading(false);
+      }
     }
-    if (financialRecords.length === 0) {
-      setFinancialRecords(generateMockFinancialRecords());
-    }
+
+    loadData();
   }, []);
+
+  // Wrapper functions that save to both Supabase and localStorage
+  const handleSetJobCards = async (newData: JobCardRecord[] | ((prev: JobCardRecord[]) => JobCardRecord[])) => {
+    if (typeof newData === 'function') {
+      setJobCards(newData);
+    } else {
+      setJobCards(newData);
+    }
+  };
+
+  const handleSetFinancialRecords = async (newData: FinancialRecord[] | ((prev: FinancialRecord[]) => FinancialRecord[])) => {
+    if (typeof newData === 'function') {
+      setFinancialRecords(newData);
+    } else {
+      setFinancialRecords(newData);
+    }
+  };
+
+  // Loading screen
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-gray-600">Connecting to database...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Connection Error Banner */}
+      {connectionError && (
+        <div className="bg-amber-50 border-b border-amber-200 px-4 py-3">
+          <div className="max-w-7xl mx-auto flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-amber-800 font-medium">{connectionError}</p>
+              <p className="text-xs text-amber-600 mt-1">
+                Data is being saved locally. To sync with database, check your Supabase connection.
+              </p>
+            </div>
+            <button 
+              onClick={() => setConnectionError(null)}
+              className="text-amber-600 hover:text-amber-800"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3">
@@ -134,9 +214,9 @@ function App() {
 
         {/* Module Content */}
         {activeModule === 'jobcards' ? (
-          <JobCardModule records={jobCards} setRecords={setJobCards} />
+          <JobCardModule records={jobCards} setRecords={handleSetJobCards} />
         ) : (
-          <FinancialTrackerModule records={financialRecords} setRecords={setFinancialRecords} />
+          <FinancialTrackerModule records={financialRecords} setRecords={handleSetFinancialRecords} />
         )}
       </main>
 
@@ -145,7 +225,7 @@ function App() {
         <div className="flex items-center justify-around py-2 px-4">
           <button
             onClick={() => setActiveModule('jobcards')}
-            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl min-w-[80px] min-h-[56px] transition-all ${
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl min-w-[80px] min-h-[56px] transition-all relative ${
               activeModule === 'jobcards'
                 ? 'text-indigo-600'
                 : 'text-gray-400'
@@ -159,7 +239,7 @@ function App() {
           </button>
           <button
             onClick={() => setActiveModule('financial')}
-            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl min-w-[80px] min-h-[56px] transition-all ${
+            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl min-w-[80px] min-h-[56px] transition-all relative ${
               activeModule === 'financial'
                 ? 'text-indigo-600'
                 : 'text-gray-400'

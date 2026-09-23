@@ -1,23 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// ============================================================================
-// IMPORTANT: Replace these with YOUR Supabase credentials!
-// ============================================================================
-// 1. Go to your Supabase dashboard
-// 2. Click Settings (gear icon) → API
-// 3. Copy your "Project URL" and paste it below
-// 4. Copy your "anon public" key and paste it below
-// ============================================================================
+// Your Supabase credentials
+const supabaseUrl = 'https://eflhvxlcwgkitfbsnqnk.supabase.co';
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmbGh2eGxjd2draXRmYnNucW5rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxMzg1NTEsImV4cCI6MjEwNTcxNDU1MX0.ttcSeV9nui0OwtNs0LZC8yGhuB8Q_ZXmI66wGDFyIEs';
 
-const supabaseUrl = 'YOUR_SUPABASE_URL_HERE'; // Example: 'https://abcdefghijk.supabase.co'
-const supabaseAnonKey = 'YOUR_SUPABASE_ANON_KEY_HERE'; // Example: 'eyJhbGciOiJIUzI1NiIs...'
-
-// ============================================================================
-// Don't edit below this line!
-// ============================================================================
-
-if (supabaseUrl === 'YOUR_SUPABASE_URL_HERE' || supabaseAnonKey === 'YOUR_SUPABASE_ANON_KEY_HERE') {
-  console.warn('⚠️ Supabase credentials not configured! Please update src/lib/supabase.ts with your credentials.');
-}
-
+// Create the Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);

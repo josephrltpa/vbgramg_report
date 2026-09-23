@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Plus, FileSpreadsheet, ExternalLink } from 'lucide-react';
 import { FinancialRecord, ProcessingStage, CreditStatus } from '../types';
 import { VILLAGES } from '../data/mockData';
+import { addFinancialRecord, updateFinancialRecordStatus } from '../lib/services';
 import VillageSelector from './VillageSelector';
 import MonthTabs from './MonthTabs';
 import FinancialMobileCard from './FinancialMobileCard';
@@ -42,7 +43,8 @@ export default function FinancialTrackerModule({ records, setRecords }: Financia
     return { total, totalAmount, credited, pending };
   }, [filteredRecords]);
 
-  const handleStatusToggle = (id: string, field: 'creditStatus' | 'processingStage', value: string) => {
+  const handleStatusToggle = async (id: string, field: 'creditStatus' | 'processingStage', value: string) => {
+    // Update local state immediately for instant feedback
     setRecords((prev: FinancialRecord[]) =>
       prev.map((r) =>
         r.id === id
@@ -50,9 +52,16 @@ export default function FinancialTrackerModule({ records, setRecords }: Financia
           : r
       )
     );
+
+    // Save to Supabase
+    try {
+      await updateFinancialRecordStatus(id, field, value);
+    } catch (error) {
+      console.error('Failed to save to Supabase:', error);
+    }
   };
 
-  const handleAddRecord = (data: {
+  const handleAddRecord = async (data: {
     demandId: string;
     workName: string;
     amountCredited: number;
@@ -68,7 +77,16 @@ export default function FinancialTrackerModule({ records, setRecords }: Financia
       ...data,
       createdAt: new Date().toISOString(),
     };
+
+    // Update local state immediately
     setRecords((prev: FinancialRecord[]) => [newRecord, ...prev]);
+
+    // Save to Supabase
+    try {
+      await addFinancialRecord(newRecord);
+    } catch (error) {
+      console.error('Failed to save to Supabase:', error);
+    }
   };
 
   const formatAmount = (amount: number) => {
