@@ -28,6 +28,7 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
   const [requests, setRequests] = useState<JCRequest[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'Submitted' | 'Completed' | 'Rejected'>('all');
   const [newReq, setNewReq] = useState({
     jobCardNumber: '',
     headName: '',
@@ -45,6 +46,18 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
     setRequests(data);
     setLoading(false);
   }
+  
+  // Filter requests by status
+  const filteredRequests = statusFilter === 'all' 
+    ? requests 
+    : requests.filter(r => r.status === statusFilter);
+    
+  const statusCounts = {
+    all: requests.length,
+    Submitted: requests.filter(r => r.status === 'Submitted').length,
+    Completed: requests.filter(r => r.status === 'Completed').length,
+    Rejected: requests.filter(r => r.status === 'Rejected').length,
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -168,73 +181,125 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
         </form>
       )}
 
-      {/* Requests List */}
-      <div className="space-y-3">
-        {requests.map((req) => {
+      {/* Status Filter Tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-2">
+        {(['all', 'Submitted', 'Completed', 'Rejected'] as const).map((status) => (
+          <button
+            key={status}
+            onClick={() => setStatusFilter(status)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${
+              statusFilter === status
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {status === 'all' ? 'All' : status} ({statusCounts[status]})
+          </button>
+        ))}
+      </div>
+
+      {/* Requests List - Compact */}
+      <div className="space-y-2">
+        {filteredRequests.map((req) => {
           const StatusIcon = statusIcons[req.status];
           return (
-            <div key={req.id} className="bg-white rounded-xl border border-gray-100 p-4 space-y-3">
-              {/* Request Header */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${statusColors[req.status]}`}>
-                      <StatusIcon className="w-3 h-3" />
-                      {req.status}
-                    </span>
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      req.requestType === 'Add New JC' ? 'bg-green-50 text-green-700' :
-                      req.requestType === 'Delete JC' ? 'bg-red-50 text-red-700' :
-                      'bg-blue-50 text-blue-700'
-                    }`}>
-                      {req.requestType}
-                    </span>
-                  </div>
-                  <h4 className="text-sm font-semibold text-gray-900">{req.headName}</h4>
-                  <p className="text-xs text-gray-500 font-mono">{req.jobCardNumber}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-400">{req.requestDate}</p>
-                  <p className="text-xs text-gray-400">by {req.requestedBy}</p>
-                </div>
-              </div>
-
-              {/* Remarks */}
-              {req.remarks && (
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-xs text-gray-500 mb-1">Remarks:</p>
-                  <p className="text-sm text-gray-700">{req.remarks}</p>
-                </div>
-              )}
-
-              {/* CA Feedback */}
-              {req.feedback && (
-                <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
-                  <p className="text-xs text-emerald-600 font-medium mb-1">
-                    <MessageSquare className="w-3 h-3 inline" /> Feedback from {req.processedBy}:
-                  </p>
-                  <p className="text-sm text-emerald-800">{req.feedback}</p>
-                  {req.actionDate && <p className="text-xs text-emerald-500 mt-1">Action date: {req.actionDate}</p>}
-                </div>
-              )}
-
-              {/* CA Actions (only for computer assistant) */}
-              {userRole === 'computer_assistant' && req.status !== 'Completed' && req.status !== 'Rejected' && (
-                <CAActionPanel
-                  requestId={req.id}
-                  onAction={handleCAAction}
-                />
-              )}
-            </div>
+            <CompactRequestCard
+              key={req.id}
+              request={req}
+              userRole={userRole}
+              onAction={handleCAAction}
+            />
           );
         })}
       </div>
 
-      {requests.length === 0 && (
+      {filteredRequests.length === 0 && (
         <div className="text-center py-8">
           <MessageSquare className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-          <p className="text-sm text-gray-500">No requests yet</p>
-          {userRole === 'secretary' && <p className="text-xs text-gray-400 mt-1">Click "New Request" to submit one</p>}
+          <p className="text-sm text-gray-500">
+            {statusFilter === 'all' ? 'No requests yet' : `No ${statusFilter.toLowerCase()} requests`}
+          </p>
+          {userRole === 'secretary' && statusFilter === 'all' && (
+            <p className="text-xs text-gray-400 mt-1">Click "New Request" to submit one</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Compact Request Card
+function CompactRequestCard({ request: req, userRole, onAction }: { request: JCRequest; userRole: string; onAction: (id: string, status: RequestStatus, feedback: string) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const StatusIcon = statusIcons[req.status];
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+      {/* Compact Header - Always Visible */}
+      <div className="flex items-center gap-3 p-3">
+        {/* Status Badge */}
+        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium border ${statusColors[req.status]}`}>
+          <StatusIcon className="w-3 h-3" />
+          <span className="hidden sm:inline">{req.status}</span>
+        </span>
+
+        {/* Main Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-900 truncate">{req.headName}</span>
+            <span className={`text-xs px-1.5 py-0.5 rounded ${
+              req.requestType === 'Add New JC' ? 'bg-green-100 text-green-700' :
+              req.requestType === 'Delete JC' ? 'bg-red-100 text-red-700' :
+              'bg-blue-100 text-blue-700'
+            }`}>
+              {req.requestType === 'Add New JC' ? '+' : req.requestType === 'Delete JC' ? '-' : '~'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <span className="font-mono">{req.jobCardNumber}</span>
+            <span>•</span>
+            <span>{req.requestDate}</span>
+          </div>
+        </div>
+
+        {/* Expand Button */}
+        {(req.remarks || req.feedback) && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-gray-400 hover:text-gray-600 p-1"
+          >
+            <svg className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Expanded Details */}
+      {expanded && (
+        <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-2">
+          {req.remarks && (
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Remarks:</p>
+              <p className="text-sm text-gray-700">{req.remarks}</p>
+            </div>
+          )}
+          {req.feedback && (
+            <div className="bg-emerald-50 rounded p-2 border border-emerald-100">
+              <p className="text-xs text-emerald-600 font-medium">
+                <MessageSquare className="w-3 h-3 inline" /> {req.processedBy}:
+              </p>
+              <p className="text-sm text-emerald-800 mt-1">{req.feedback}</p>
+              {req.actionDate && <p className="text-xs text-emerald-500 mt-1">{req.actionDate}</p>}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CA Actions */}
+      {userRole === 'computer_assistant' && req.status === 'Submitted' && (
+        <div className="border-t border-gray-100 p-3">
+          <CAActionPanel requestId={req.id} onAction={onAction} />
         </div>
       )}
     </div>
@@ -248,18 +313,18 @@ function CAActionPanel({ requestId, onAction }: { requestId: string; onAction: (
   const [selectedStatus, setSelectedStatus] = useState<RequestStatus>('Completed');
 
   return (
-    <div className="border-t border-gray-100 pt-3">
+    <div>
       {!showInput ? (
         <div className="flex gap-2">
           <button
             onClick={() => { setShowInput(true); setSelectedStatus('Completed'); }}
-            className="flex-1 bg-emerald-600 text-white py-2 rounded-lg text-xs font-medium min-h-[40px]"
+            className="flex-1 bg-emerald-600 text-white py-1.5 rounded text-xs font-medium"
           >
-            ✓ Mark Completed
+            ✓ Complete
           </button>
           <button
             onClick={() => { setShowInput(true); setSelectedStatus('Rejected'); }}
-            className="flex-1 bg-red-600 text-white py-2 rounded-lg text-xs font-medium min-h-[40px]"
+            className="flex-1 bg-red-600 text-white py-1.5 rounded text-xs font-medium"
           >
             ✗ Reject
           </button>
@@ -269,21 +334,21 @@ function CAActionPanel({ requestId, onAction }: { requestId: string; onAction: (
           <textarea
             value={feedback}
             onChange={(e) => setFeedback(e.target.value)}
-            placeholder="Add feedback for VEC (e.g. 'Added to portal', 'Aadhar mismatch - please correct')"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none min-h-[60px]"
+            placeholder="Add feedback..."
+            className="w-full border border-gray-200 rounded px-2 py-1.5 text-xs outline-none min-h-[50px]"
           />
           <div className="flex gap-2">
             <button
               onClick={() => onAction(requestId, selectedStatus, feedback)}
-              className={`flex-1 py-2 rounded-lg text-xs font-medium min-h-[40px] text-white ${
+              className={`flex-1 py-1.5 rounded text-xs font-medium text-white ${
                 selectedStatus === 'Completed' ? 'bg-emerald-600' : 'bg-red-600'
               }`}
             >
-              Submit Feedback
+              Submit
             </button>
             <button
               onClick={() => setShowInput(false)}
-              className="px-3 bg-gray-200 text-gray-700 py-2 rounded-lg text-xs font-medium min-h-[40px]"
+              className="px-2 bg-gray-200 text-gray-700 py-1.5 rounded text-xs font-medium"
             >
               Cancel
             </button>

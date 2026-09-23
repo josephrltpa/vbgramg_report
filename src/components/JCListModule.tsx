@@ -14,6 +14,8 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newJC, setNewJC] = useState({ jobCardNumber: '', headName: '' });
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
 
   useEffect(() => {
     loadJobCards();
@@ -24,7 +26,14 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
     console.log('[JCList] Loading job cards for village:', village);
     const data = await fetchJobCards(village);
     console.log('[JCList] Received data:', data.length, 'cards');
-    setJobCards(data);
+    
+    // Sort by job card number
+    const sorted = data.sort((a, b) => {
+      return a.jobCardNumber.localeCompare(b.jobCardNumber);
+    });
+    
+    setJobCards(sorted);
+    setCurrentPage(1); // Reset to first page
     setLoading(false);
   }
 
@@ -57,6 +66,12 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
     jc.headName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     jc.jobCardNumber.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Pagination
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedCards = filtered.slice(startIndex, endIndex);
 
   if (loading) {
     return <div className="text-center py-8 text-gray-500">Loading job cards...</div>;
@@ -150,9 +165,9 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {filtered.map((jc, idx) => (
+            {paginatedCards.map((jc, idx) => (
               <tr key={jc.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
+                <td className="px-4 py-3 text-gray-400 text-xs">{startIndex + idx + 1}</td>
                 <td className="px-4 py-3 font-mono text-xs text-gray-700">{jc.jobCardNumber}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{jc.headName}</td>
                 <td className="px-4 py-3">
@@ -168,11 +183,11 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
 
       {/* Mobile Cards */}
       <div className="md:hidden space-y-2">
-        {filtered.map((jc, idx) => (
+        {paginatedCards.map((jc, idx) => (
           <div key={jc.id} className="bg-white rounded-xl border border-gray-100 p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-gray-400 font-mono">#{idx + 1} • {jc.jobCardNumber}</p>
+                <p className="text-xs text-gray-400 font-mono">#{startIndex + idx + 1} • {jc.jobCardNumber}</p>
                 <h4 className="text-sm font-semibold text-gray-900 mt-1">{jc.headName}</h4>
               </div>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
@@ -182,6 +197,34 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3">
+          <div className="text-sm text-gray-600">
+            Showing {startIndex + 1}-{Math.min(endIndex, filtered.length)} of {filtered.length}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <div className="text-center py-8">
