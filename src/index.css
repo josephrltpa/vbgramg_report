@@ -1,1 +1,39 @@
 @import "tailwindcss";
+
+/* Hide scrollbar for month tabs */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Better touch targets */
+@media (max-width: 768px) {
+  select, input, button {
+    font-size: 16px !important;
+  }
+}
+
+/* Custom backdrop blur support */
+@supports not (backdrop-filter: blur(12px)) {
+  .backdrop-blur-md {
+    background-color: rgba(255, 255, 255, 0.98);
+  }
+  .backdrop-blur-sm {
+    background-color: rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Safe area padding for mobile */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  nav.fixed.bottom-0 {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
