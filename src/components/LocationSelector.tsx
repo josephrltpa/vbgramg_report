@@ -7,8 +7,8 @@ interface LocationSelectorProps {
   selectedDistrict: string;
   selectedBlock: string;
   selectedVillage: string;
-  onDistrictChange: (districtId: string) => void;
-  onBlockChange: (blockId: string) => void;
+  onDistrictChange: (districtId: string, districtName: string) => void;
+  onBlockChange: (blockId: string, blockName: string) => void;
   onVillageChange: (villageName: string) => void;
 }
 
@@ -38,7 +38,7 @@ export default function LocationSelector({
       setBlocks([]);
     }
     // Reset block and village when district changes
-    onBlockChange('');
+    onBlockChange('', '');
     onVillageChange('');
     setVillages([]);
   }, [selectedDistrict]);
@@ -84,7 +84,10 @@ export default function LocationSelector({
           <MapPin className="w-4 h-4 text-indigo-600 shrink-0" />
           <select
             value={selectedDistrict}
-            onChange={(e) => onDistrictChange(e.target.value)}
+            onChange={(e) => {
+              const district = districts.find(d => d.id === e.target.value);
+              onDistrictChange(e.target.value, district?.name || '');
+            }}
             className="flex-1 bg-transparent text-sm font-medium text-gray-800 appearance-none outline-none cursor-pointer min-h-[28px]"
             disabled={loading}
           >
@@ -105,7 +108,10 @@ export default function LocationSelector({
           <MapPin className="w-4 h-4 text-indigo-600 shrink-0" />
           <select
             value={selectedBlock}
-            onChange={(e) => onBlockChange(e.target.value)}
+            onChange={(e) => {
+              const block = blocks.find(b => b.id === e.target.value);
+              onBlockChange(e.target.value, block?.name || '');
+            }}
             className="flex-1 bg-transparent text-sm font-medium text-gray-800 appearance-none outline-none cursor-pointer min-h-[28px]"
             disabled={!selectedDistrict || loading}
           >

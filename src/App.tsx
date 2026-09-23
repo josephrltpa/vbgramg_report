@@ -21,12 +21,18 @@ function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   
-  // Hierarchical location state
-  const [selectedDistrict, setSelectedDistrict] = useState<string>(() => {
-    return localStorage.getItem('mgnrega_selected_district') || '';
+  // Hierarchical location state - store both ID and name
+  const [selectedDistrictId, setSelectedDistrictId] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_district_id') || '';
   });
-  const [selectedBlock, setSelectedBlock] = useState<string>(() => {
-    return localStorage.getItem('mgnrega_selected_block') || '';
+  const [selectedDistrictName, setSelectedDistrictName] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_district_name') || '';
+  });
+  const [selectedBlockId, setSelectedBlockId] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_block_id') || '';
+  });
+  const [selectedBlockName, setSelectedBlockName] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_block_name') || '';
   });
   const [selectedVillage, setSelectedVillage] = useState<string>(() => {
     return localStorage.getItem('mgnrega_selected_village') || '';
@@ -40,15 +46,19 @@ function App() {
     }
   };
   
-  const handleDistrictChange = (districtId: string) => {
-    setSelectedDistrict(districtId);
-    localStorage.setItem('mgnrega_selected_district', districtId);
+  const handleDistrictChange = (districtId: string, districtName: string) => {
+    setSelectedDistrictId(districtId);
+    setSelectedDistrictName(districtName);
+    localStorage.setItem('mgnrega_selected_district_id', districtId);
+    localStorage.setItem('mgnrega_selected_district_name', districtName);
     setRefreshKey(prev => prev + 1);
   };
   
-  const handleBlockChange = (blockId: string) => {
-    setSelectedBlock(blockId);
-    localStorage.setItem('mgnrega_selected_block', blockId);
+  const handleBlockChange = (blockId: string, blockName: string) => {
+    setSelectedBlockId(blockId);
+    setSelectedBlockName(blockName);
+    localStorage.setItem('mgnrega_selected_block_id', blockId);
+    localStorage.setItem('mgnrega_selected_block_name', blockName);
     setRefreshKey(prev => prev + 1);
   };
   
@@ -83,7 +93,7 @@ function App() {
   const displayVillage = village === 'all' 
     ? 'All Villages' 
     : selectedVillage 
-      ? `${selectedVillage}${selectedBlock ? ` • ${selectedBlock}` : ''}${selectedDistrict ? ` • ${selectedDistrict}` : ''}`
+      ? `${selectedVillage}${selectedBlockName ? ` • ${selectedBlockName}` : ''}${selectedDistrictName ? ` • ${selectedDistrictName}` : ''}`
       : 'Select Location';
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -113,8 +123,8 @@ function App() {
             {userRole === 'computer_assistant' && (
               <div className="flex items-center gap-2">
                 <LocationSelector
-                  selectedDistrict={selectedDistrict}
-                  selectedBlock={selectedBlock}
+                  selectedDistrict={selectedDistrictId}
+                  selectedBlock={selectedBlockId}
                   selectedVillage={selectedVillage}
                   onDistrictChange={handleDistrictChange}
                   onBlockChange={handleBlockChange}
@@ -167,8 +177,8 @@ function App() {
               {userRole === 'computer_assistant' && (
                 <div className="px-4 py-2 space-y-3">
                   <LocationSelector
-                    selectedDistrict={selectedDistrict}
-                    selectedBlock={selectedBlock}
+                    selectedDistrict={selectedDistrictId}
+                    selectedBlock={selectedBlockId}
                     selectedVillage={selectedVillage}
                     onDistrictChange={handleDistrictChange}
                     onBlockChange={handleBlockChange}
