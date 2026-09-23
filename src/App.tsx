@@ -121,10 +121,10 @@ function App() {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                <span className="text-white text-sm font-bold">M</span>
+                <span className="text-white text-sm font-bold">V</span>
               </div>
               <div>
-                <h1 className="text-sm font-bold text-gray-900 leading-tight">MGNREGA VEC Portal</h1>
+                <h1 className="text-sm font-bold text-gray-900 leading-tight">VBGRAMG VEC Portal</h1>
                 <p className="text-xs text-gray-500">{displayVillage} • {userRole === 'computer_assistant' ? 'Computer Assistant' : 'Login'}</p>
               </div>
             </div>

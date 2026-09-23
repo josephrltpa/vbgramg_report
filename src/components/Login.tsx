@@ -66,9 +66,9 @@ export default function Login({ onLogin }: LoginProps) {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <span className="text-white text-2xl font-bold">M</span>
+            <span className="text-white text-2xl font-bold">V</span>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">MGNREGA</h1>
+          <h1 className="text-2xl font-bold text-gray-900">VBGRAMG</h1>
           <p className="text-sm text-gray-500 mt-1">Village Employment Committee Portal</p>
         </div>
 
