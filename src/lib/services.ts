@@ -116,13 +116,19 @@ export async function updateJCRequest(id: string, updates: {
 // MONTHLY DEMANDS
 // ============================================================================
 export async function fetchMonthlyDemands(village: string, month: number, year: number): Promise<MonthlyDemand[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from('monthly_demands')
     .select('*')
-    .eq('village', village)
     .eq('month', month)
-    .eq('year', year)
-    .order('head_name');
+    .eq('year', year);
+  
+  // Only filter by village if it's a specific village (not 'all')
+  if (village && village !== 'all') {
+    query = query.eq('village', village);
+  }
+  
+  query = query.order('head_name');
+  const { data, error } = await query;
   if (error) { console.error('Error fetching demands:', error); return []; }
   return (data || []).map((row: any) => ({
     id: row.id,

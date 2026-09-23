@@ -67,12 +67,37 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
   }
 
   async function handleCAAction(id: string, status: RequestStatus, feedback: string) {
+    // First, update the request status
     await updateJCRequest(id, {
       status,
       feedback,
       actionDate: new Date().toISOString().split('T')[0],
       processedBy: username,
     });
+    
+    // If completed and it's an "Add New JC" request, also add the job card
+    if (status === 'Completed') {
+      const request = requests.find(r => r.id === id);
+      if (request && request.requestType === 'Add New JC') {
+        const { addJobCard } = await import('../lib/services');
+        await addJobCard({
+          jobCardNumber: request.jobCardNumber,
+          headName: request.headName,
+          village: request.village,
+          isActive: true,
+        });
+      }
+      // If "Delete JC" request, mark the card as inactive
+      if (request && request.requestType === 'Delete JC') {
+        const { supabase } = await import('../lib/supabase');
+        await supabase
+          .from('job_cards')
+          .update({ is_active: false })
+          .eq('job_card_number', request.jobCardNumber)
+          .eq('village', request.village);
+      }
+    }
+    
     await loadRequests();
   }
 
