@@ -48,6 +48,27 @@ export interface MonthlyDemand {
   createdAt: string;
 }
 
+export interface District {
+  id: string;
+  name: string;
+  state: string;
+}
+
+export interface Block {
+  id: string;
+  name: string;
+  district_id: string;
+  district_name?: string;
+}
+
+export interface Village {
+  id: string;
+  name: string;
+  block_id: string;
+  block_name?: string;
+  district_name?: string;
+}
+
 export const MONTHS = [
   { label: 'Apr', fullLabel: 'April', index: 4 },
   { label: 'May', fullLabel: 'May', index: 5 },
