@@ -1,186 +1,157 @@
 import { supabase } from './supabase';
-import { JobCardRecord, FinancialRecord, RequestType, ApprovalStatus, OfficeAction, ProcessingStage, CreditStatus } from '../types';
+import { JobCard, JCRequest, MonthlyDemand, RequestStatus, CreditStatus } from '../types';
 
 // ============================================================================
-// VILLAGES
+// JOB CARDS (Fixed list)
 // ============================================================================
-export async function fetchVillages() {
-  const { data, error } = await supabase
-    .from('villages')
-    .select('*')
-    .order('name');
-
-  if (error) {
-    console.error('Error fetching villages:', error);
-    return [];
+export async function fetchJobCards(village?: string): Promise<JobCard[]> {
+  let query = supabase.from('job_cards').select('*').eq('is_active', true);
+  if (village && village !== 'all') {
+    query = query.eq('village', village);
   }
-  return data || [];
-}
-
-// ============================================================================
-// JOB CARDS
-// ============================================================================
-export async function fetchJobCards(): Promise<JobCardRecord[]> {
-  const { data, error } = await supabase
-    .from('job_cards')
-    .select(`
-      *,
-      villages:village_id (name)
-    `)
-    .order('sl_no', { ascending: true });
-
-  if (error) {
-    console.error('Error fetching job cards:', error);
-    return [];
-  }
-
-  // Transform Supabase data to match our app's format
+  const { data, error } = await query.order('head_name');
+  if (error) { console.error('Error fetching job cards:', error); return []; }
   return (data || []).map((row: any) => ({
     id: row.id,
-    slNo: row.sl_no,
     jobCardNumber: row.job_card_number,
     headName: row.head_name,
-    remarks: row.remarks as RequestType,
-    requestDate: row.request_date,
-    approvalStatus: row.approval_status as ApprovalStatus,
-    officeAction: row.office_action as OfficeAction,
-    village: row.villages?.name || '',
+    village: row.village,
     createdAt: row.created_at,
+    isActive: row.is_active,
   }));
 }
 
-export async function addJobCard(record: Omit<JobCardRecord, 'id' | 'createdAt'>) {
-  // First, find the village_id
-  const { data: village } = await supabase
-    .from('villages')
-    .select('id')
-    .eq('name', record.village)
-    .single();
-
-  if (!village) {
-    console.error('Village not found:', record.village);
-    return null;
-  }
-
-  const { data, error } = await supabase
-    .from('job_cards')
-    .insert({
-      sl_no: record.slNo,
-      job_card_number: record.jobCardNumber,
-      head_name: record.headName,
-      remarks: record.remarks,
-      request_date: record.requestDate,
-      approval_status: record.approvalStatus,
-      office_action: record.officeAction,
-      village_id: village.id,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error adding job card:', error);
-    return null;
-  }
+export async function addJobCard(jc: Omit<JobCard, 'id' | 'createdAt'>) {
+  const { data, error } = await supabase.from('job_cards').insert({
+    job_card_number: jc.jobCardNumber,
+    head_name: jc.headName,
+    village: jc.village,
+    is_active: jc.isActive,
+  }).select().single();
+  if (error) { console.error('Error adding job card:', error); return null; }
   return data;
 }
 
-export async function updateJobCardStatus(
-  id: string,
-  field: 'approvalStatus' | 'officeAction',
-  value: string
-) {
-  const dbField = field === 'approvalStatus' ? 'approval_status' : 'office_action';
-
-  const { error } = await supabase
-    .from('job_cards')
-    .update({ [dbField]: value })
-    .eq('id', id);
-
-  if (error) {
-    console.error('Error updating job card:', error);
-  }
-}
-
 // ============================================================================
-// FINANCIAL RECORDS
+// JC REQUESTS (VEC requests + CA feedback)
 // ============================================================================
-export async function fetchFinancialRecords(): Promise<FinancialRecord[]> {
-  const { data, error } = await supabase
-    .from('financial_records')
-    .select(`
-      *,
-      villages:village_id (name)
-    `)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Error fetching financial records:', error);
-    return [];
+export async function fetchJCRequests(village?: string): Promise<JCRequest[]> {
+  let query = supabase.from('jc_requests').select('*');
+  if (village && village !== 'all') {
+    query = query.eq('village', village);
   }
-
+  const { data, error } = await query.order('request_date', { ascending: false });
+  if (error) { console.error('Error fetching requests:', error); return []; }
   return (data || []).map((row: any) => ({
     id: row.id,
-    demandId: row.demand_id,
-    workName: row.work_name,
-    amountCredited: row.amount_credited,
-    creditStatus: row.credit_status as CreditStatus,
+    jobCardNumber: row.job_card_number,
+    headName: row.head_name,
+    village: row.village,
+    requestType: row.request_type,
+    remarks: row.remarks || '',
+    requestDate: row.request_date,
+    status: row.status,
+    feedback: row.feedback || '',
+    actionDate: row.action_date || '',
+    requestedBy: row.requested_by || '',
+    processedBy: row.processed_by || '',
+  }));
+}
+
+export async function addJCRequest(req: Omit<JCRequest, 'id' | 'status' | 'feedback' | 'actionDate' | 'processedBy'>) {
+  const { data, error } = await supabase.from('jc_requests').insert({
+    job_card_number: req.jobCardNumber,
+    head_name: req.headName,
+    village: req.village,
+    request_type: req.requestType,
+    remarks: req.remarks,
+    request_date: req.requestDate,
+    requested_by: req.requestedBy,
+    status: 'Submitted',
+  }).select().single();
+  if (error) { console.error('Error adding request:', error); return null; }
+  return data;
+}
+
+export async function updateJCRequest(id: string, updates: {
+  status?: RequestStatus;
+  feedback?: string;
+  actionDate?: string;
+  processedBy?: string;
+}) {
+  const dbUpdates: any = {};
+  if (updates.status) dbUpdates.status = updates.status;
+  if (updates.feedback !== undefined) dbUpdates.feedback = updates.feedback;
+  if (updates.actionDate) dbUpdates.action_date = updates.actionDate;
+  if (updates.processedBy) dbUpdates.processed_by = updates.processedBy;
+
+  const { error } = await supabase.from('jc_requests').update(dbUpdates).eq('id', id);
+  if (error) console.error('Error updating request:', error);
+}
+
+// ============================================================================
+// MONTHLY DEMANDS
+// ============================================================================
+export async function fetchMonthlyDemands(village: string, month: number, year: number): Promise<MonthlyDemand[]> {
+  const { data, error } = await supabase
+    .from('monthly_demands')
+    .select('*')
+    .eq('village', village)
+    .eq('month', month)
+    .eq('year', year)
+    .order('head_name');
+  if (error) { console.error('Error fetching demands:', error); return []; }
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    jobCardId: row.job_card_id,
+    jobCardNumber: row.job_card_number,
+    headName: row.head_name,
+    village: row.village,
+    month: row.month,
+    year: row.year,
+    daysWorked: row.days_worked || 0,
+    wageAmount: row.wage_amount || 0,
+    creditStatus: row.credit_status,
     creditDate: row.credit_date || '',
-    attachmentLink: row.attachment_link || '',
-    processingStage: row.processing_stage as ProcessingStage,
-    month: row.fy_month,
-    village: row.villages?.name || '',
+    wagelistLink: row.wagelist_link || '',
     createdAt: row.created_at,
   }));
 }
 
-export async function addFinancialRecord(record: Omit<FinancialRecord, 'id' | 'createdAt'>) {
-  const { data: village } = await supabase
-    .from('villages')
-    .select('id')
-    .eq('name', record.village)
-    .single();
-
-  if (!village) {
-    console.error('Village not found:', record.village);
-    return null;
-  }
-
-  const { data, error } = await supabase
-    .from('financial_records')
-    .insert({
-      demand_id: record.demandId,
-      work_name: record.workName,
-      amount_credited: record.amountCredited,
-      credit_status: record.creditStatus,
-      credit_date: record.creditDate || null,
-      attachment_link: record.attachmentLink,
-      processing_stage: record.processingStage,
-      fy_month: record.month,
-      village_id: village.id,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    console.error('Error adding financial record:', error);
-    return null;
-  }
+export async function addMonthlyDemand(demand: Omit<MonthlyDemand, 'id' | 'createdAt'>) {
+  const { data, error } = await supabase.from('monthly_demands').insert({
+    job_card_id: demand.jobCardId,
+    job_card_number: demand.jobCardNumber,
+    head_name: demand.headName,
+    village: demand.village,
+    month: demand.month,
+    year: demand.year,
+    days_worked: demand.daysWorked,
+    wage_amount: demand.wageAmount,
+    credit_status: demand.creditStatus,
+    credit_date: demand.creditDate || null,
+    wagelist_link: demand.wagelistLink,
+  }).select().single();
+  if (error) { console.error('Error adding demand:', error); return null; }
   return data;
 }
 
-export async function updateFinancialRecordStatus(
-  id: string,
-  field: 'creditStatus' | 'processingStage',
-  value: string
-) {
-  const dbField = field === 'creditStatus' ? 'credit_status' : 'processing_stage';
+export async function updateDemandCreditStatus(id: string, status: CreditStatus, creditDate?: string) {
+  const { error } = await supabase.from('monthly_demands').update({
+    credit_status: status,
+    credit_date: creditDate || null,
+  }).eq('id', id);
+  if (error) console.error('Error updating demand:', error);
+}
 
-  const { error } = await supabase
-    .from('financial_records')
-    .update({ [dbField]: value })
-    .eq('id', id);
+export async function updateDemandWagelistLink(id: string, link: string) {
+  const { error } = await supabase.from('monthly_demands').update({
+    wagelist_link: link,
+  }).eq('id', id);
+  if (error) console.error('Error updating wagelist link:', error);
+}
 
-  if (error) {
-    console.error('Error updating financial record:', error);
-  }
+export async function deleteMonthlyDemand(id: string) {
+  const { error } = await supabase.from('monthly_demands').delete().eq('id', id);
+  if (error) console.error('Error deleting demand:', error);
 }
