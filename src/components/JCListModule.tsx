@@ -71,26 +71,20 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
     }
   }
 
+  const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+
   async function handleDeleteJC(id: string) {
-    console.log('[JCList] Delete button clicked for:', id);
-    
-    if (!confirm('Are you sure you want to delete this job card? This action cannot be undone.')) {
-      console.log('[JCList] Delete cancelled by user');
-      return;
-    }
-    
-    console.log('[JCList] Calling deleteJobCard...');
-    const success = await deleteJobCard(id);
-    console.log('[JCList] Delete result:', success);
-    
+    const jc = jobCards.find(j => j.id === id);
+    setDeleteConfirm({ id, name: jc?.headName || '' });
+  }
+
+  async function confirmDelete() {
+    if (!deleteConfirm) return;
+    const success = await deleteJobCard(deleteConfirm.id);
     if (success) {
-      console.log('[JCList] Removing from local state...');
-      setJobCards(prev => prev.filter(jc => jc.id !== id));
-      console.log('[JCList] Job card deleted successfully');
-    } else {
-      console.error('[JCList] Failed to delete job card');
-      alert('Failed to delete job card. Please check the console for details.');
+      setJobCards(prev => prev.filter(jc => jc.id !== deleteConfirm.id));
     }
+    setDeleteConfirm(null);
   }
 
   const filtered = jobCards.filter(jc =>
@@ -363,6 +357,32 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
         <div className="text-center py-8">
           <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
           <p className="text-sm text-gray-500">No job cards found</p>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Job Card</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete <strong>{deleteConfirm.name}</strong>? This action cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
