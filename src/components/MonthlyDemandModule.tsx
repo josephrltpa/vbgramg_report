@@ -90,6 +90,17 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     await loadData();
   }
 
+  async function handleMarkAllPending() {
+    const creditedDemands = demands.filter(d => d.creditStatus === 'Credited');
+    
+    // Update all credited demands back to pending
+    for (const demand of creditedDemands) {
+      await updateDemandCreditStatus(demand.id, 'Pending', '');
+    }
+    
+    await loadData();
+  }
+
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -215,19 +226,35 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
       </div>
 
       {/* Bulk Actions for Admin */}
-      {userRole === 'computer_assistant' && pendingCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <div className="flex items-center justify-between">
+      {userRole === 'computer_assistant' && (pendingCount > 0 || creditedCount > 0) && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <p className="text-sm font-medium text-amber-900">Bulk Actions</p>
-              <p className="text-xs text-amber-700">{pendingCount} demands pending credit status</p>
+              <p className="text-sm font-medium text-gray-900">Bulk Actions</p>
+              <p className="text-xs text-gray-600">
+                {pendingCount > 0 && <span className="text-amber-600">{pendingCount} pending</span>}
+                {pendingCount > 0 && creditedCount > 0 && <span> • </span>}
+                {creditedCount > 0 && <span className="text-emerald-600">{creditedCount} credited</span>}
+              </p>
             </div>
-            <button
-              onClick={handleMarkAllCredited}
-              className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
-            >
-              Mark All as Credited
-            </button>
+            <div className="flex gap-2">
+              {pendingCount > 0 && (
+                <button
+                  onClick={handleMarkAllCredited}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+                >
+                  Mark All as Credited
+                </button>
+              )}
+              {creditedCount > 0 && (
+                <button
+                  onClick={handleMarkAllPending}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
+                >
+                  Mark All as Pending
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
