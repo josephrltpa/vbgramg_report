@@ -5,14 +5,43 @@ interface LoginProps {
   onLogin: (username: string, village: string) => void;
 }
 
-// For now, simple login - later we'll add proper authentication
+// Village credentials - simple username/password for each village
 const USERS = [
-  { username: 'rampur_sec', password: 'vec123', village: 'Rampur', role: 'secretary' },
-  { username: 'sundarpur_sec', password: 'vec123', village: 'Sundarpur', role: 'secretary' },
-  { username: 'kishangarh_sec', password: 'vec123', village: 'Kishangarh', role: 'secretary' },
-  { username: 'devgarh_sec', password: 'vec123', village: 'Devgarh', role: 'secretary' },
-  { username: 'chandpur_sec', password: 'vec123', village: 'Chandpur', role: 'secretary' },
+  // Admin (Computer Assistant) - can see all villages
   { username: 'admin', password: 'admin123', village: 'all', role: 'computer_assistant' },
+  
+  // Thingsulthliah Block (Aizawl District) - 10 villages
+  { username: 'darlawng', password: 'vec123', village: 'Darlawng', role: 'secretary' },
+  { username: 'phulmawi', password: 'vec123', village: 'Phulmawi', role: 'secretary' },
+  { username: 'seling', password: 'vec123', village: 'Seling', role: 'secretary' },
+  { username: 'sesawng1', password: 'vec123', village: 'Sesawng I', role: 'secretary' },
+  { username: 'sesawng2', password: 'vec123', village: 'Sesawng II', role: 'secretary' },
+  { username: 'sesawng3', password: 'vec123', village: 'Sesawng III', role: 'secretary' },
+  { username: 'thingsulthliah1', password: 'vec123', village: 'Thingsulthliah - I', role: 'secretary' },
+  { username: 'thingsulthliah2', password: 'vec123', village: 'Thingsulthliah II', role: 'secretary' },
+  { username: 'tlangnuam', password: 'vec123', village: 'Tlangnuam', role: 'secretary' },
+  { username: 'tlungvel', password: 'vec123', village: 'Tlungvel', role: 'secretary' },
+  
+  // Phullen Block (Saitual District) - 19 villages
+  { username: 'buhban', password: 'vec123', village: 'Buhban', role: 'secretary' },
+  { username: 'dilkhan', password: 'vec123', village: 'Dilkhan', role: 'secretary' },
+  { username: 'keifangleitan', password: 'vec123', village: 'Keifang Leitan', role: 'secretary' },
+  { username: 'keifangvenghlun', password: 'vec123', village: 'Keifang Venghlun', role: 'secretary' },
+  { username: 'keifangvenglai', password: 'vec123', village: 'Keifang Venglai', role: 'secretary' },
+  { username: 'khanpui', password: 'vec123', village: 'Khanpui', role: 'secretary' },
+  { username: 'lailak', password: 'vec123', village: 'Lailak', role: 'secretary' },
+  { username: 'lenchim', password: 'vec123', village: 'Lenchim', role: 'secretary' },
+  { username: 'lungpher', password: 'vec123', village: 'Lungpher', role: 'secretary' },
+  { username: 'maite', password: 'vec123', village: 'Maite', role: 'secretary' },
+  { username: 'mualpheng', password: 'vec123', village: 'Mualpheng', role: 'secretary' },
+  { username: 'ruallung', password: 'vec123', village: 'Ruallung', role: 'secretary' },
+  { username: 'rulchawm', password: 'vec123', village: 'Rulchawm', role: 'secretary' },
+  { username: 'saitualvenglai', password: 'vec123', village: 'Saitual Venglai', role: 'secretary' },
+  { username: 'saitual1', password: 'vec123', village: 'Saitual-I', role: 'secretary' },
+  { username: 'saitual3', password: 'vec123', village: 'Saitual-III', role: 'secretary' },
+  { username: 'sihfa', password: 'vec123', village: 'Sihfa', role: 'secretary' },
+  { username: 'tawizo', password: 'vec123', village: 'Tawizo', role: 'secretary' },
+  { username: 'tualbung', password: 'vec123', village: 'Tualbung', role: 'secretary' },
 ];
 
 export default function Login({ onLogin }: LoginProps) {
@@ -92,10 +121,12 @@ export default function Login({ onLogin }: LoginProps) {
 
         {/* Demo Credentials */}
         <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-          <p className="text-xs font-semibold text-gray-700 mb-2">Demo Credentials:</p>
+          <p className="text-xs font-semibold text-gray-700 mb-2">Login Credentials:</p>
           <div className="space-y-1 text-xs text-gray-600">
-            <p><strong>VEC Secretary:</strong> rampur_sec / vec123</p>
             <p><strong>Computer Assistant:</strong> admin / admin123</p>
+            <p className="mt-2 font-semibold">VEC Secretaries (password: vec123):</p>
+            <p className="font-mono text-[10px]">buhban, darlawng, phulmawi, seling...</p>
+            <p className="text-[10px] text-gray-500">(username = village name in lowercase)</p>
           </div>
         </div>
       </div>

@@ -8,14 +8,15 @@ import LocationSelector from './components/LocationSelector';
 
 type Tab = 'jclist' | 'requests' | 'demands';
 
-// Store user session in localStorage
-const USERS: Record<string, { village: string; role: string }> = {
-  'admin': { village: 'all', role: 'computer_assistant' },
-};
-
 function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(() => {
     return localStorage.getItem('mgnrega_user');
+  });
+  const [userVillage, setUserVillage] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_user_village') || '';
+  });
+  const [userRole, setUserRole] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_user_role') || 'secretary';
   });
   const [activeTab, setActiveTab] = useState<Tab>('jclist');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -68,33 +69,42 @@ function App() {
     setRefreshKey(prev => prev + 1);
   };
 
-  const handleLogin = (username: string) => {
+  const handleLogin = (username: string, village: string) => {
     localStorage.setItem('mgnrega_user', username);
+    localStorage.setItem('mgnrega_user_village', village);
+    
+    // Determine role based on username
+    const role = username === 'admin' ? 'computer_assistant' : 'secretary';
+    localStorage.setItem('mgnrega_user_role', role);
+    
     setCurrentUser(username);
+    setUserVillage(village);
+    setUserRole(role);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('mgnrega_user');
+    localStorage.removeItem('mgnrega_user_village');
+    localStorage.removeItem('mgnrega_user_role');
     setCurrentUser(null);
+    setUserVillage('');
+    setUserRole('secretary');
   };
 
   // Not logged in - show login
   if (!currentUser) {
     return <Login onLogin={handleLogin} />;
   }
-
-  const userInfo = USERS[currentUser];
-  const userRole = userInfo?.role || 'secretary';
   
   // For admin, use selectedVillage. For secretary, use their assigned village.
-  const village = userRole === 'computer_assistant' ? selectedVillage : (userInfo?.village || 'all');
+  const village = userRole === 'computer_assistant' ? selectedVillage : userVillage;
   
   // Build display string for location hierarchy
-  const displayVillage = village === 'all' 
-    ? 'All Villages' 
-    : selectedVillage 
-      ? `${selectedVillage}${selectedBlockName ? ` • ${selectedBlockName}` : ''}${selectedDistrictName ? ` • ${selectedDistrictName}` : ''}`
-      : 'Select Location';
+  const displayVillage = userRole === 'computer_assistant'
+    ? (selectedVillage 
+        ? `${selectedVillage}${selectedBlockName ? ` • ${selectedBlockName}` : ''}${selectedDistrictName ? ` • ${selectedDistrictName}` : ''}`
+        : 'Select Location')
+    : userVillage || 'Village';
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: 'jclist', label: 'JC List', icon: ClipboardList },
