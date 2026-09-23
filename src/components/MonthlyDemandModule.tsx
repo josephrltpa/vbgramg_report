@@ -11,7 +11,7 @@ interface MonthlyDemandModuleProps {
 
 export default function MonthlyDemandModule({ village, userRole }: MonthlyDemandModuleProps) {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(2025);
+  const [selectedYear, setSelectedYear] = useState(2026);
   const [jobCards, setJobCards] = useState<JobCard[]>([]);
   const [demands, setDemands] = useState<MonthlyDemand[]>([]);
   const [showAddPanel, setShowAddPanel] = useState(false);
