@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, FileText, CheckCircle2, XCircle, Trash2 } from 'lucide-react';
+import { Plus, Search, FileText, CheckCircle2, XCircle, Trash2, Upload } from 'lucide-react';
 import { JobCard, JCRequest } from '../types';
 import { fetchJobCards, addJobCard, updateJobCardStatus, deleteJobCard } from '../lib/services';
+import { parseExcelFile, importJobCards, ImportResult } from '../lib/excelImport';
 
 interface JCListModuleProps {
   village: string;
@@ -72,6 +73,38 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
   }
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportResult(null);
+
+    try {
+      const data = await parseExcelFile(file);
+      const result = await importJobCards(data, village);
+      setImportResult(result);
+      
+      // Reload job cards if any were imported successfully
+      if (result.success > 0) {
+        await loadJobCards();
+      }
+    } catch (error: any) {
+      setImportResult({
+        success: 0,
+        failed: 0,
+        errors: [`Failed to parse Excel file: ${error.message}`],
+      });
+    } finally {
+      setImporting(false);
+      // Reset file input
+      e.target.value = '';
+    }
+  }
 
   async function handleDeleteJC(id: string) {
     const jc = jobCards.find(j => j.id === id);
@@ -124,13 +157,22 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
           🔄 Reload
         </button>
         {userRole === 'computer_assistant' && (
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
-          >
-            <Plus className="w-4 h-4" />
-            Add JC
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
+            >
+              <Upload className="w-4 h-4" />
+              Import Excel
+            </button>
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              Add JC
+            </button>
+          </div>
         )}
       </div>
 
@@ -381,6 +423,87 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
               >
                 Delete
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Excel Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-lg w-full shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Import Job Cards from Excel</h3>
+            
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-blue-900 mb-2">Excel Format Requirements:</p>
+                <ul className="text-xs text-blue-700 space-y-1">
+                  <li>• Column headers: <strong>Job Card Number</strong> (or JC Number) and <strong>Head Name</strong> (or Name)</li>
+                  <li>• All job cards will be added to village: <strong>{village}</strong></li>
+                  <li>• Duplicate job card numbers will be rejected</li>
+                </ul>
+              </div>
+
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleImportExcel}
+                  disabled={importing}
+                  className="hidden"
+                  id="excel-import"
+                />
+                <label
+                  htmlFor="excel-import"
+                  className="cursor-pointer inline-flex flex-col items-center"
+                >
+                  <Upload className="w-12 h-12 text-gray-400 mb-2" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {importing ? 'Importing...' : 'Click to select Excel file'}
+                  </span>
+                  <span className="text-xs text-gray-500 mt-1">Supports .xlsx and .xls files</span>
+                </label>
+              </div>
+
+              {importResult && (
+                <div className={`border rounded-lg p-4 ${
+                  importResult.success > 0 && importResult.failed === 0
+                    ? 'bg-green-50 border-green-200'
+                    : importResult.success > 0
+                    ? 'bg-yellow-50 border-yellow-200'
+                    : 'bg-red-50 border-red-200'
+                }`}>
+                  <p className="text-sm font-medium mb-2">Import Results:</p>
+                  <div className="text-xs space-y-1">
+                    <p className="text-green-700">✓ Successfully imported: {importResult.success}</p>
+                    {importResult.failed > 0 && (
+                      <p className="text-red-700">✗ Failed: {importResult.failed}</p>
+                    )}
+                  </div>
+                  {importResult.errors.length > 0 && (
+                    <div className="mt-3 max-h-40 overflow-y-auto">
+                      <p className="text-xs font-medium text-red-700 mb-1">Errors:</p>
+                      <ul className="text-xs text-red-600 space-y-1">
+                        {importResult.errors.map((error, idx) => (
+                          <li key={idx}>• {error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportResult(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

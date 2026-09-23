@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, Check, X, Upload, Download, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, FileText, Check, X, Upload, Download, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { JobCard, MonthlyDemand, MONTHS, CreditStatus } from '../types';
 import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, updateDemandWagelistLink, deleteMonthlyDemand } from '../lib/services';
+import { parseExcelFile, importMonthlyDemands, ImportResult } from '../lib/excelImport';
 
 interface MonthlyDemandModuleProps {
   village: string;
@@ -14,7 +15,14 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   const [jobCards, setJobCards] = useState<JobCard[]>([]);
   const [demands, setDemands] = useState<MonthlyDemand[]>([]);
   const [showAddPanel, setShowAddPanel] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(200);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -28,6 +36,7 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     ]);
     setJobCards(jcs);
     setDemands(dems);
+    setCurrentPage(1);
     setLoading(false);
   }
 
@@ -45,7 +54,10 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
       creditDate: '',
       wagelistLink: '',
     });
-    if (result) await loadData();
+    if (result) {
+      await loadData();
+      setShowAddPanel(false);
+    }
   }
 
   async function handleToggleCredit(demand: MonthlyDemand) {
@@ -61,9 +73,35 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   }
 
   async function handleDelete(id: string) {
-    if (confirm('Remove this member from monthly demand?')) {
-      await deleteMonthlyDemand(id);
-      await loadData();
+    await deleteMonthlyDemand(id);
+    setDeleteConfirm(null);
+    await loadData();
+  }
+
+  async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportResult(null);
+
+    try {
+      const data = await parseExcelFile(file);
+      const result = await importMonthlyDemands(data, village, selectedMonth, selectedYear);
+      setImportResult(result);
+      
+      if (result.success > 0) {
+        await loadData();
+      }
+    } catch (error: any) {
+      setImportResult({
+        success: 0,
+        failed: 0,
+        errors: [`Failed to parse Excel file: ${error.message}`],
+      });
+    } finally {
+      setImporting(false);
+      e.target.value = '';
     }
   }
 
@@ -72,14 +110,62 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     !demands.some(d => d.jobCardId === jc.id)
   );
 
+  const filtered = demands.filter(d =>
+    d.headName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    d.jobCardNumber.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Pagination
+  const isAllRows = rowsPerPage === 'all';
+  const itemsPerPage = isAllRows ? filtered.length : rowsPerPage;
+  const totalPages = isAllRows ? 1 : Math.ceil(filtered.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedDemands = filtered.slice(startIndex, endIndex);
+
   const totalWage = demands.reduce((sum, d) => sum + d.wageAmount, 0);
   const creditedCount = demands.filter(d => d.creditStatus === 'Credited').length;
   const pendingCount = demands.filter(d => d.creditStatus === 'Pending').length;
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+  };
 
   if (loading) return <div className="text-center py-8 text-gray-500">Loading...</div>;
 
   return (
     <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">Monthly Demand List</h3>
+          <p className="text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+              📍 {village}
+            </span>
+            {' '}• {demands.length} members
+          </p>
+        </div>
+        {userRole === 'computer_assistant' && (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
+            >
+              <Upload className="w-4 h-4" />
+              Import Excel
+            </button>
+            <button
+              onClick={() => setShowAddPanel(!showAddPanel)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
+            >
+              <Plus className="w-4 h-4" />
+              Add Member
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Month Selector */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="flex-1">
@@ -116,17 +202,6 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
         </div>
       </div>
 
-      {/* Add Member Button */}
-      {userRole === 'secretary' && (
-        <button
-          onClick={() => setShowAddPanel(!showAddPanel)}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-indigo-600 text-white rounded-xl text-sm font-medium min-h-[48px]"
-        >
-          <Plus className="w-4 h-4" />
-          Add Member to Demand List
-        </button>
-      )}
-
       {/* Add Member Panel */}
       {showAddPanel && (
         <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 space-y-2">
@@ -156,32 +231,241 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
         </div>
       )}
 
-      {/* Demand List */}
-      <div className="space-y-2">
-        {demands.map((demand) => (
+      {/* Search */}
+      <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5">
+        <Search className="w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search by name or JC number..."
+          className="flex-1 text-sm outline-none bg-transparent"
+        />
+      </div>
+
+      {/* Desktop Table */}
+      <div className="hidden md:block bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">#</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">JC Number</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Name</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Days</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Amount</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Wagelist</th>
+              {userRole === 'computer_assistant' && (
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Actions</th>
+              )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {paginatedDemands.map((demand, idx) => (
+              <DemandRow
+                key={demand.id}
+                demand={demand}
+                index={startIndex + idx + 1}
+                userRole={userRole}
+                onToggleCredit={handleToggleCredit}
+                onUpdateWagelist={handleUpdateWagelist}
+                onDelete={setDeleteConfirm}
+              />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Cards */}
+      <div className="md:hidden space-y-2">
+        {paginatedDemands.map((demand, idx) => (
           <DemandCard
             key={demand.id}
             demand={demand}
+            index={startIndex + idx + 1}
             userRole={userRole}
             onToggleCredit={handleToggleCredit}
             onUpdateWagelist={handleUpdateWagelist}
-            onDelete={handleDelete}
+            onDelete={setDeleteConfirm}
           />
         ))}
       </div>
 
-      {demands.length === 0 && (
+      {/* Pagination Controls */}
+      {filtered.length > 0 && (
+        <div className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3">
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-600">
+              {isAllRows ? (
+                `Showing all ${filtered.length} members`
+              ) : (
+                `Showing ${startIndex + 1}-${Math.min(endIndex, filtered.length)} of ${filtered.length}`
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Rows per page:</label>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setRowsPerPage(value === 'all' ? 'all' : Number(value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+                <option value="all">All</option>
+              </select>
+            </div>
+          </div>
+          {!isAllRows && totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {filtered.length === 0 && (
         <div className="text-center py-8">
-          <p className="text-sm text-gray-500">No members added for this month yet</p>
-          <p className="text-xs text-gray-400 mt-1">Click "Add Member" to select from JC list</p>
+          <FileText className="w-10 h-10 text-gray-300 mx-auto mb-2" />
+          <p className="text-sm text-gray-500">No demands found for this month</p>
+          {userRole === 'computer_assistant' && (
+            <p className="text-xs text-gray-400 mt-1">Click "Import Excel" or "Add Member" to get started</p>
+          )}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Remove from Demand List</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to remove this member from the monthly demand list?
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirm)}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Excel Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-lg w-full shadow-xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Import Monthly Demands from Excel</h3>
+            
+            <div className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <p className="text-sm font-medium text-blue-900 mb-2">Excel Format Requirements:</p>
+                <ul className="text-xs text-blue-700 space-y-1">
+                  <li>• Column headers: <strong>Job Card Number</strong>, <strong>Head Name</strong>, <strong>Days Worked</strong>, <strong>Amount</strong></li>
+                  <li>• All demands will be added to: <strong>{village}</strong> for <strong>{MONTHS.find(m => m.index === selectedMonth)?.fullLabel} {selectedYear}</strong></li>
+                  <li>• Job cards must exist in the JC List</li>
+                </ul>
+              </div>
+
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleImportExcel}
+                  disabled={importing}
+                  className="hidden"
+                  id="demand-excel-import"
+                />
+                <label
+                  htmlFor="demand-excel-import"
+                  className="cursor-pointer inline-flex flex-col items-center"
+                >
+                  <Upload className="w-12 h-12 text-gray-400 mb-2" />
+                  <span className="text-sm font-medium text-gray-700">
+                    {importing ? 'Importing...' : 'Click to select Excel file'}
+                  </span>
+                  <span className="text-xs text-gray-500 mt-1">Supports .xlsx and .xls files</span>
+                </label>
+              </div>
+
+              {importResult && (
+                <div className={`border rounded-lg p-4 ${
+                  importResult.success > 0 && importResult.failed === 0
+                    ? 'bg-green-50 border-green-200'
+                    : importResult.success > 0
+                    ? 'bg-yellow-50 border-yellow-200'
+                    : 'bg-red-50 border-red-200'
+                }`}>
+                  <p className="text-sm font-medium mb-2">Import Results:</p>
+                  <div className="text-xs space-y-1">
+                    <p className="text-green-700">✓ Successfully imported: {importResult.success}</p>
+                    {importResult.failed > 0 && (
+                      <p className="text-red-700">✗ Failed: {importResult.failed}</p>
+                    )}
+                  </div>
+                  {importResult.errors.length > 0 && (
+                    <div className="mt-3 max-h-40 overflow-y-auto">
+                      <p className="text-xs font-medium text-red-700 mb-1">Errors:</p>
+                      <ul className="text-xs text-red-600 space-y-1">
+                        {importResult.errors.map((error, idx) => (
+                          <li key={idx}>• {error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportResult(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-// Month Selector (horizontal scrollable pills)
-function MonthSelector({ selectedMonth, onSelect }: { selectedMonth: number; onSelect: (m: number) => void }) {
+// Month Selector Component
+function MonthSelector({ selectedMonth, onSelect }: { selectedMonth: number; onSelect: (month: number) => void }) {
   return (
     <div className="flex overflow-x-auto whitespace-nowrap gap-1.5 pb-1 scrollbar-hide snap-x">
       {MONTHS.map((m) => (
@@ -201,147 +485,211 @@ function MonthSelector({ selectedMonth, onSelect }: { selectedMonth: number; onS
   );
 }
 
-// Individual Demand Card
-function DemandCard({
+// Desktop Table Row Component
+function DemandRow({
   demand,
+  index,
   userRole,
   onToggleCredit,
   onUpdateWagelist,
   onDelete,
 }: {
   demand: MonthlyDemand;
+  index: number;
   userRole: string;
   onToggleCredit: (d: MonthlyDemand) => void;
   onUpdateWagelist: (id: string, link: string) => void;
   onDelete: (id: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [editingLink, setEditingLink] = useState(false);
   const [linkInput, setLinkInput] = useState(demand.wagelistLink);
-  const [showLinkInput, setShowLinkInput] = useState(false);
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-      {/* Main row */}
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <h4 className="text-sm font-semibold text-gray-900">{demand.headName}</h4>
-            <p className="text-xs text-gray-500 font-mono">{demand.jobCardNumber}</p>
-            {demand.wageAmount > 0 && (
-              <p className="text-sm font-bold text-gray-800 mt-1">{formatAmount(demand.wageAmount)}</p>
-            )}
-          </div>
-
-          {/* Credit Toggle */}
-          <button
-            onClick={() => onToggleCredit(demand)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold min-h-[44px] min-w-[90px] justify-center active:scale-95 transition-transform ${
-              demand.creditStatus === 'Credited'
-                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                : 'bg-amber-100 text-amber-700 border border-amber-200'
-            }`}
-          >
-            {demand.creditStatus === 'Credited' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-            {demand.creditStatus === 'Credited' ? 'Credited' : 'Pending'}
-          </button>
-        </div>
-
-        {/* Expand toggle */}
+    <tr className="hover:bg-gray-50">
+      <td className="px-4 py-3 text-gray-400 text-xs">{index}</td>
+      <td className="px-4 py-3 font-mono text-xs text-gray-700">{demand.jobCardNumber}</td>
+      <td className="px-4 py-3 font-medium text-gray-900">{demand.headName}</td>
+      <td className="px-4 py-3 text-gray-700">{demand.daysWorked}</td>
+      <td className="px-4 py-3 font-semibold text-gray-800">{formatAmount(demand.wageAmount)}</td>
+      <td className="px-4 py-3">
         <button
-          onClick={() => setExpanded(!expanded)}
-          className="mt-2 flex items-center gap-1 text-xs text-indigo-600 font-medium min-h-[32px]"
+          onClick={() => onToggleCredit(demand)}
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold min-h-[32px] ${
+            demand.creditStatus === 'Credited'
+              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+              : 'bg-amber-100 text-amber-700 border border-amber-200'
+          }`}
         >
-          {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          Wagelist & Details
+          {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+          {demand.creditStatus}
+        </button>
+      </td>
+      <td className="px-4 py-3">
+        {editingLink ? (
+          <div className="flex gap-1">
+            <input
+              type="url"
+              value={linkInput}
+              onChange={(e) => setLinkInput(e.target.value)}
+              placeholder="Paste link..."
+              className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 min-w-[150px]"
+            />
+            <button
+              onClick={() => { onUpdateWagelist(demand.id, linkInput); setEditingLink(false); }}
+              className="text-xs text-indigo-600 font-medium"
+            >
+              Save
+            </button>
+          </div>
+        ) : demand.wagelistLink ? (
+          <a
+            href={demand.wagelistLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-600 hover:underline text-xs flex items-center gap-1"
+          >
+            <Download className="w-3 h-3" />
+            View
+          </a>
+        ) : (
+          <button
+            onClick={() => setEditingLink(true)}
+            className="text-xs text-gray-400 hover:text-gray-600"
+          >
+            Add link
+          </button>
+        )}
+      </td>
+      {userRole === 'computer_assistant' && (
+        <td className="px-4 py-3">
+          <button
+            onClick={() => onDelete(demand.id)}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </td>
+      )}
+    </tr>
+  );
+}
+
+// Mobile Card Component
+function DemandCard({
+  demand,
+  index,
+  userRole,
+  onToggleCredit,
+  onUpdateWagelist,
+  onDelete,
+}: {
+  demand: MonthlyDemand;
+  index: number;
+  userRole: string;
+  onToggleCredit: (d: MonthlyDemand) => void;
+  onUpdateWagelist: (id: string, link: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [editingLink, setEditingLink] = useState(false);
+  const [linkInput, setLinkInput] = useState(demand.wagelistLink);
+
+  const formatAmount = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-4">
+      <div className="flex items-start justify-between mb-2">
+        <div>
+          <p className="text-xs text-gray-400 font-mono">#{index} • {demand.jobCardNumber}</p>
+          <h4 className="text-sm font-semibold text-gray-900 mt-1">{demand.headName}</h4>
+          <p className="text-sm font-bold text-gray-800 mt-1">{formatAmount(demand.wageAmount)}</p>
+        </div>
+        <button
+          onClick={() => onToggleCredit(demand)}
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+            demand.creditStatus === 'Credited'
+              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+              : 'bg-amber-100 text-amber-700 border border-amber-200'
+          }`}
+        >
+          {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+          {demand.creditStatus}
         </button>
       </div>
 
-      {/* Expanded section */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="mt-2 flex items-center gap-1 text-xs text-indigo-600 font-medium min-h-[32px]"
+      >
+        {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        Details
+      </button>
+
       {expanded && (
-        <div className="px-4 pb-4 pt-0 border-t border-gray-50">
-          <div className="space-y-3 mt-3">
-            {/* Days worked & amount */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Days Worked</label>
-                <input
-                  type="number"
-                  defaultValue={demand.daysWorked}
-                  onBlur={(e) => {/* TODO: update */}}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none min-h-[40px]"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Wage Amount (₹)</label>
-                <input
-                  type="number"
-                  defaultValue={demand.wageAmount}
-                  onBlur={(e) => {/* TODO: update */}}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none min-h-[40px]"
-                />
-              </div>
-            </div>
-
-            {/* Wagelist Link */}
-            <div>
-              <label className="text-xs text-gray-500 block mb-1">Wagelist / Bill Link</label>
-              {demand.wagelistLink && !showLinkInput ? (
-                <div className="flex items-center gap-2">
-                  <a
-                    href={demand.wagelistLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex items-center gap-2 text-sm text-indigo-600 font-medium bg-indigo-50 rounded-lg px-3 py-2.5 min-h-[44px]"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span className="truncate">{demand.wagelistLink}</span>
-                  </a>
-                  <button
-                    onClick={() => setShowLinkInput(true)}
-                    className="px-3 py-2.5 bg-gray-100 rounded-lg min-h-[44px]"
-                  >
-                    <Upload className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    value={linkInput}
-                    onChange={(e) => setLinkInput(e.target.value)}
-                    placeholder="Paste Drive/Dropbox link (PDF, Excel, HTML)"
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none min-h-[44px]"
-                  />
-                  <button
-                    onClick={() => { onUpdateWagelist(demand.id, linkInput); setShowLinkInput(false); }}
-                    className="px-3 bg-indigo-600 text-white rounded-lg min-h-[44px]"
-                  >
-                    Save
-                  </button>
-                </div>
-              )}
-              <p className="text-xs text-gray-400 mt-1">Supports PDF, Excel, HTML files via Google Drive, Dropbox, etc.</p>
-            </div>
-
-            {/* Delete */}
-            {userRole === 'secretary' && (
-              <button
-                onClick={() => onDelete(demand.id)}
-                className="flex items-center gap-1.5 text-xs text-red-600 font-medium min-h-[36px]"
-              >
-                <Trash2 className="w-3 h-3" />
-                Remove from demand list
-              </button>
-            )}
-
-            {demand.creditDate && (
-              <p className="text-xs text-gray-400">Credited on: {demand.creditDate}</p>
-            )}
+        <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-500">Days Worked:</span>
+            <span className="font-medium text-gray-700">{demand.daysWorked}</span>
           </div>
+
+          {editingLink ? (
+            <div className="space-y-2">
+              <input
+                type="url"
+                value={linkInput}
+                onChange={(e) => setLinkInput(e.target.value)}
+                placeholder="Paste wagelist link..."
+                className="w-full text-xs border border-gray-200 rounded px-2 py-1.5"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { onUpdateWagelist(demand.id, linkInput); setEditingLink(false); }}
+                  className="flex-1 text-xs bg-indigo-600 text-white py-1.5 rounded"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingLink(false)}
+                  className="flex-1 text-xs bg-gray-200 text-gray-700 py-1.5 rounded"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : demand.wagelistLink ? (
+            <a
+              href={demand.wagelistLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-indigo-600 font-medium bg-indigo-50 rounded-lg px-3 py-2"
+            >
+              <Download className="w-4 h-4" />
+              View Wagelist
+            </a>
+          ) : (
+            <button
+              onClick={() => setEditingLink(true)}
+              className="w-full text-xs text-gray-400 hover:text-gray-600 text-left"
+            >
+              + Add wagelist link
+            </button>
+          )}
+
+          {userRole === 'computer_assistant' && (
+            <button
+              onClick={() => onDelete(demand.id)}
+              className="w-full flex items-center justify-center gap-1.5 text-xs text-red-600 font-medium bg-red-50 rounded-lg py-2 mt-2"
+            >
+              <Trash2 className="w-3 h-3" />
+              Remove from list
+            </button>
+          )}
         </div>
       )}
     </div>
