@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { JCRequest, RequestType, RequestStatus } from '../types';
-import { fetchJCRequests, addJCRequest, updateJCRequest } from '../lib/services';
+import { fetchJCRequests, addJCRequest, updateJCRequest, addJobCard } from '../lib/services';
+import { supabase } from '../lib/supabase';
 
 interface JCRequestModuleProps {
   village: string;
@@ -79,7 +80,6 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
     if (status === 'Completed') {
       const request = requests.find(r => r.id === id);
       if (request && request.requestType === 'Add New JC') {
-        const { addJobCard } = await import('../lib/services');
         await addJobCard({
           jobCardNumber: request.jobCardNumber,
           headName: request.headName,
@@ -89,7 +89,6 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
       }
       // If "Delete JC" request, mark the card as inactive
       if (request && request.requestType === 'Delete JC') {
-        const { supabase } = await import('../lib/supabase');
         await supabase
           .from('job_cards')
           .update({ is_active: false })
