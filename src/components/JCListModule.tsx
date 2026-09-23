@@ -68,7 +68,12 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-bold text-gray-900">Job Card List</h3>
-          <p className="text-xs text-gray-500">{village} • {jobCards.length} cards</p>
+          <p className="text-xs text-gray-500">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs font-medium">
+              📍 {village}
+            </span>
+            {' '}• {jobCards.length} cards
+          </p>
         </div>
         <button
           onClick={loadJobCards}
@@ -90,6 +95,10 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
       {/* Add Form */}
       {showAddForm && (
         <form onSubmit={handleAddJC} className="bg-indigo-50 rounded-xl p-4 space-y-3 border border-indigo-100">
+          <div className="bg-white rounded-lg px-3 py-2 border border-indigo-200">
+            <p className="text-xs text-gray-500">Adding to village:</p>
+            <p className="text-sm font-semibold text-indigo-700">{village}</p>
+          </div>
           <input
             type="text"
             value={newJC.jobCardNumber}

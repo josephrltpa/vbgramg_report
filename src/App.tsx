@@ -25,6 +25,9 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>('jclist');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedVillage, setSelectedVillage] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_village') || VILLAGES[0];
+  });
   
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
@@ -32,6 +35,12 @@ function App() {
     if (tab === 'jclist') {
       setRefreshKey(prev => prev + 1);
     }
+  };
+  
+  const handleVillageChange = (village: string) => {
+    setSelectedVillage(village);
+    localStorage.setItem('mgnrega_selected_village', village);
+    setRefreshKey(prev => prev + 1);
   };
 
   const handleLogin = (username: string) => {
@@ -50,8 +59,10 @@ function App() {
   }
 
   const userInfo = USERS[currentUser];
-  const village = userInfo?.village || 'all';
   const userRole = userInfo?.role || 'secretary';
+  
+  // For admin, use selectedVillage. For secretary, use their assigned village.
+  const village = userRole === 'computer_assistant' ? selectedVillage : (userInfo?.village || 'all');
   const displayVillage = village === 'all' ? 'All Villages' : village;
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -76,6 +87,19 @@ function App() {
                 <p className="text-xs text-gray-500">{displayVillage} • {userRole === 'secretary' ? 'VEC Secretary' : 'Computer Assistant'}</p>
               </div>
             </div>
+            
+            {/* Village Selector for Admin */}
+            {userRole === 'computer_assistant' && (
+              <select
+                value={selectedVillage}
+                onChange={(e) => handleVillageChange(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+              >
+                {VILLAGES.map(v => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+            )}
 
             {/* Desktop Nav */}
             <nav className="hidden md:flex items-center gap-1">
@@ -117,6 +141,22 @@ function App() {
           {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div className="md:hidden mt-3 pb-2 border-t border-gray-100 pt-3 space-y-2">
+              {/* Village Selector for Admin - Mobile */}
+              {userRole === 'computer_assistant' && (
+                <div className="px-4 py-2">
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Select Village</label>
+                  <select
+                    value={selectedVillage}
+                    onChange={(e) => handleVillageChange(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    {VILLAGES.map(v => (
+                      <option key={v} value={v}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
