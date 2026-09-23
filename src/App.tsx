@@ -24,6 +24,15 @@ function App() {
   });
   const [activeTab, setActiveTab] = useState<Tab>('jclist');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    // Force reload when switching to JC List tab
+    if (tab === 'jclist') {
+      setRefreshKey(prev => prev + 1);
+    }
+  };
 
   const handleLogin = (username: string) => {
     localStorage.setItem('mgnrega_user', username);
@@ -75,7 +84,7 @@ function App() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
+                    onClick={() => handleTabChange(tab.id)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       activeTab === tab.id
                         ? 'bg-indigo-50 text-indigo-700'
@@ -113,7 +122,7 @@ function App() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => { setActiveTab(tab.id); setMobileMenuOpen(false); }}
+                    onClick={() => { handleTabChange(tab.id); setMobileMenuOpen(false); }}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium min-h-[48px] ${
                       activeTab === tab.id
                         ? 'bg-indigo-50 text-indigo-700 border border-indigo-100'
@@ -140,7 +149,7 @@ function App() {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-4 pb-24">
         {activeTab === 'jclist' && (
-          <JCListModule village={village} userRole={userRole} />
+          <JCListModule key={refreshKey} village={village} userRole={userRole} />
         )}
         {activeTab === 'requests' && (
           <JCRequestModule village={village} username={currentUser} userRole={userRole} />
@@ -158,7 +167,7 @@ function App() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl min-w-[70px] min-h-[56px] relative ${
                   activeTab === tab.id ? 'text-indigo-600' : 'text-gray-400'
                 }`}
