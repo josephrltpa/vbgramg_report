@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, MessageSquare, CheckCircle, XCircle, Clock, MessageCircle, Send } from 'lucide-react';
 import { JCRequest, RequestType, RequestStatus } from '../types';
-import { fetchJCRequests, addJCRequest, updateJCRequest, addJobCard } from '../lib/services';
+import { fetchJCRequests, addJCRequest, updateJCRequest, addJobCard, fetchRequestComments, addRequestComment, RequestComment } from '../lib/services';
 import { supabase } from '../lib/supabase';
 
 interface JCRequestModuleProps {
@@ -207,6 +207,7 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
               key={req.id}
               request={req}
               userRole={userRole}
+              username={username}
               onAction={handleCAAction}
             />
           );
@@ -229,9 +230,43 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
 }
 
 // Compact Request Card
-function CompactRequestCard({ request: req, userRole, onAction }: { request: JCRequest; userRole: string; onAction: (id: string, status: RequestStatus, feedback: string) => void }) {
+function CompactRequestCard({ request: req, userRole, username, onAction }: { request: JCRequest; userRole: string; username: string; onAction: (id: string, status: RequestStatus, feedback: string) => void }) {
   const [expanded, setExpanded] = useState(false);
+  const [comments, setComments] = useState<RequestComment[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [loadingComments, setLoadingComments] = useState(false);
   const StatusIcon = statusIcons[req.status];
+
+  // Load comments when expanded
+  useEffect(() => {
+    if (expanded && comments.length === 0) {
+      loadComments();
+    }
+  }, [expanded]);
+
+  async function loadComments() {
+    setLoadingComments(true);
+    const data = await fetchRequestComments(req.id);
+    setComments(data);
+    setLoadingComments(false);
+  }
+
+  async function handleAddComment() {
+    if (!newComment.trim()) return;
+    
+    const result = await addRequestComment(req.id, newComment, username, userRole);
+    if (result) {
+      setComments(prev => [...prev, {
+        id: result.id,
+        requestId: result.request_id,
+        commentText: result.comment_text,
+        commentBy: result.comment_by,
+        commentRole: result.comment_role,
+        createdAt: result.created_at,
+      }]);
+      setNewComment('');
+    }
+  }
 
   return (
     <div className="bg-white rounded-lg border border-gray-100 overflow-hidden">
@@ -263,21 +298,19 @@ function CompactRequestCard({ request: req, userRole, onAction }: { request: JCR
         </div>
 
         {/* Expand Button */}
-        {(req.remarks || req.feedback) && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="text-gray-400 hover:text-gray-600 p-1"
-          >
-            <svg className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        )}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-gray-400 hover:text-gray-600 p-1"
+        >
+          <svg className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
       </div>
 
       {/* Expanded Details */}
       {expanded && (
-        <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-2">
+        <div className="border-t border-gray-100 bg-gray-50 p-3 space-y-3">
           {req.remarks && (
             <div>
               <p className="text-xs text-gray-500 mb-1">Remarks:</p>
@@ -293,6 +326,71 @@ function CompactRequestCard({ request: req, userRole, onAction }: { request: JCR
               {req.actionDate && <p className="text-xs text-emerald-500 mt-1">{req.actionDate}</p>}
             </div>
           )}
+
+          {/* Comments Thread */}
+          <div className="border-t border-gray-200 pt-3">
+            <p className="text-xs font-medium text-gray-600 mb-2 flex items-center gap-1">
+              <MessageCircle className="w-3 h-3" />
+              Discussion ({comments.length})
+            </p>
+            
+            {loadingComments ? (
+              <p className="text-xs text-gray-400">Loading comments...</p>
+            ) : (
+              <div className="space-y-2 mb-3">
+                {comments.length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">No comments yet</p>
+                ) : (
+                  comments.map((comment) => (
+                    <div
+                      key={comment.id}
+                      className={`rounded p-2 ${
+                        comment.commentRole === 'computer_assistant'
+                          ? 'bg-blue-50 border border-blue-100'
+                          : 'bg-white border border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-semibold text-gray-700">
+                          {comment.commentBy}
+                        </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          comment.commentRole === 'computer_assistant'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {comment.commentRole === 'computer_assistant' ? 'CA' : 'VEC'}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(comment.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700">{comment.commentText}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Add Comment Input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                placeholder="Add a comment..."
+                className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-sm outline-none focus:border-indigo-400"
+              />
+              <button
+                onClick={handleAddComment}
+                disabled={!newComment.trim()}
+                className="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                <Send className="w-3 h-3" />
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

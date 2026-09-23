@@ -184,3 +184,62 @@ export async function deleteMonthlyDemand(id: string) {
   const { error } = await supabase.from('monthly_demands').delete().eq('id', id);
   if (error) console.error('Error deleting demand:', error);
 }
+
+// ============================================================================
+// REQUEST COMMENTS (Threaded discussions)
+// ============================================================================
+export interface RequestComment {
+  id: string;
+  requestId: string;
+  commentText: string;
+  commentBy: string;
+  commentRole: string;
+  createdAt: string;
+}
+
+export async function fetchRequestComments(requestId: string): Promise<RequestComment[]> {
+  const { data, error } = await supabase
+    .from('request_comments')
+    .select('*')
+    .eq('request_id', requestId)
+    .order('created_at', { ascending: true });
+  
+  if (error) {
+    console.error('Error fetching comments:', error);
+    return [];
+  }
+  
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    requestId: row.request_id,
+    commentText: row.comment_text,
+    commentBy: row.comment_by,
+    commentRole: row.comment_role,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function addRequestComment(
+  requestId: string,
+  commentText: string,
+  commentBy: string,
+  commentRole: string
+) {
+  const { data, error } = await supabase
+    .from('request_comments')
+    .insert({
+      request_id: requestId,
+      comment_text: commentText,
+      comment_by: commentBy,
+      comment_role: commentRole,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding comment:', error);
+    return null;
+  }
+  
+  return data;
+}
