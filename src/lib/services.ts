@@ -1,5 +1,73 @@
 import { supabase } from './supabase';
-import { JobCard, JCRequest, MonthlyDemand, RequestStatus, CreditStatus } from '../types';
+import { JobCard, JCRequest, MonthlyDemand, RequestStatus, CreditStatus, District, Block, Village } from '../types';
+
+// ============================================================================
+// LOCATIONS (Districts, Blocks, Villages)
+// ============================================================================
+export async function fetchDistricts(): Promise<District[]> {
+  const { data, error } = await supabase
+    .from('districts')
+    .select('*')
+    .order('name');
+  
+  if (error) {
+    console.error('Error fetching districts:', error);
+    return [];
+  }
+  
+  return data || [];
+}
+
+export async function fetchBlocks(districtId?: string): Promise<Block[]> {
+  let query = supabase
+    .from('blocks')
+    .select('*, districts(name)')
+    .order('name');
+  
+  if (districtId) {
+    query = query.eq('district_id', districtId);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('Error fetching blocks:', error);
+    return [];
+  }
+  
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    district_id: row.district_id,
+    district_name: row.districts?.name,
+  }));
+}
+
+export async function fetchVillages(blockId?: string): Promise<Village[]> {
+  let query = supabase
+    .from('villages')
+    .select('*, blocks(name, districts(name))')
+    .order('name');
+  
+  if (blockId) {
+    query = query.eq('block_id', blockId);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('Error fetching villages:', error);
+    return [];
+  }
+  
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    block_id: row.block_id,
+    block_name: row.blocks?.name,
+    district_name: row.blocks?.districts?.name,
+  }));
+}
 
 // ============================================================================
 // JOB CARDS (Fixed list)

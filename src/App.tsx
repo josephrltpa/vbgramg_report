@@ -4,17 +4,12 @@ import Login from './components/Login';
 import JCListModule from './components/JCListModule';
 import JCRequestModule from './components/JCRequestModule';
 import MonthlyDemandModule from './components/MonthlyDemandModule';
-import { VILLAGES } from './types';
+import LocationSelector from './components/LocationSelector';
 
 type Tab = 'jclist' | 'requests' | 'demands';
 
 // Store user session in localStorage
 const USERS: Record<string, { village: string; role: string }> = {
-  'rampur_sec': { village: 'Rampur', role: 'secretary' },
-  'sundarpur_sec': { village: 'Sundarpur', role: 'secretary' },
-  'kishangarh_sec': { village: 'Kishangarh', role: 'secretary' },
-  'devgarh_sec': { village: 'Devgarh', role: 'secretary' },
-  'chandpur_sec': { village: 'Chandpur', role: 'secretary' },
   'admin': { village: 'all', role: 'computer_assistant' },
 };
 
@@ -25,8 +20,16 @@ function App() {
   const [activeTab, setActiveTab] = useState<Tab>('jclist');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Hierarchical location state
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_district') || '';
+  });
+  const [selectedBlock, setSelectedBlock] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_block') || '';
+  });
   const [selectedVillage, setSelectedVillage] = useState<string>(() => {
-    return localStorage.getItem('mgnrega_selected_village') || VILLAGES[0];
+    return localStorage.getItem('mgnrega_selected_village') || '';
   });
   
   const handleTabChange = (tab: Tab) => {
@@ -35,6 +38,18 @@ function App() {
     if (tab === 'jclist') {
       setRefreshKey(prev => prev + 1);
     }
+  };
+  
+  const handleDistrictChange = (districtId: string) => {
+    setSelectedDistrict(districtId);
+    localStorage.setItem('mgnrega_selected_district', districtId);
+    setRefreshKey(prev => prev + 1);
+  };
+  
+  const handleBlockChange = (blockId: string) => {
+    setSelectedBlock(blockId);
+    localStorage.setItem('mgnrega_selected_block', blockId);
+    setRefreshKey(prev => prev + 1);
   };
   
   const handleVillageChange = (village: string) => {
@@ -63,7 +78,13 @@ function App() {
   
   // For admin, use selectedVillage. For secretary, use their assigned village.
   const village = userRole === 'computer_assistant' ? selectedVillage : (userInfo?.village || 'all');
-  const displayVillage = village === 'all' ? 'All Villages' : village;
+  
+  // Build display string for location hierarchy
+  const displayVillage = village === 'all' 
+    ? 'All Villages' 
+    : selectedVillage 
+      ? `${selectedVillage}${selectedBlock ? ` • ${selectedBlock}` : ''}${selectedDistrict ? ` • ${selectedDistrict}` : ''}`
+      : 'Select Location';
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: 'jclist', label: 'JC List', icon: ClipboardList },
@@ -88,17 +109,18 @@ function App() {
               </div>
             </div>
             
-            {/* Village Selector for Admin */}
+            {/* Location Selector for Admin */}
             {userRole === 'computer_assistant' && (
-              <select
-                value={selectedVillage}
-                onChange={(e) => handleVillageChange(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200"
-              >
-                {VILLAGES.map(v => (
-                  <option key={v} value={v}>{v}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-2">
+                <LocationSelector
+                  selectedDistrict={selectedDistrict}
+                  selectedBlock={selectedBlock}
+                  selectedVillage={selectedVillage}
+                  onDistrictChange={handleDistrictChange}
+                  onBlockChange={handleBlockChange}
+                  onVillageChange={handleVillageChange}
+                />
+              </div>
             )}
 
             {/* Desktop Nav */}
@@ -141,19 +163,17 @@ function App() {
           {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div className="md:hidden mt-3 pb-2 border-t border-gray-100 pt-3 space-y-2">
-              {/* Village Selector for Admin - Mobile */}
+              {/* Location Selector for Admin - Mobile */}
               {userRole === 'computer_assistant' && (
-                <div className="px-4 py-2">
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Select Village</label>
-                  <select
-                    value={selectedVillage}
-                    onChange={(e) => handleVillageChange(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-                  >
-                    {VILLAGES.map(v => (
-                      <option key={v} value={v}>{v}</option>
-                    ))}
-                  </select>
+                <div className="px-4 py-2 space-y-3">
+                  <LocationSelector
+                    selectedDistrict={selectedDistrict}
+                    selectedBlock={selectedBlock}
+                    selectedVillage={selectedVillage}
+                    onDistrictChange={handleDistrictChange}
+                    onBlockChange={handleBlockChange}
+                    onVillageChange={handleVillageChange}
+                  />
                 </div>
               )}
               

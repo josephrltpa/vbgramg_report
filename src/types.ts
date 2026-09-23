@@ -2,6 +2,27 @@ export type RequestType = 'Add New JC' | 'Delete JC' | 'Correction';
 export type RequestStatus = 'Submitted' | 'In Progress' | 'Completed' | 'Rejected';
 export type CreditStatus = 'Credited' | 'Pending';
 
+export interface District {
+  id: string;
+  name: string;
+  state: string;
+}
+
+export interface Block {
+  id: string;
+  name: string;
+  district_id: string;
+  district_name?: string;
+}
+
+export interface Village {
+  id: string;
+  name: string;
+  block_id: string;
+  block_name?: string;
+  district_name?: string;
+}
+
 export interface User {
   username: string;
   village: string;
