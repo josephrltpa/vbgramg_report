@@ -65,12 +65,22 @@ export async function updateJobCardStatus(id: string, isActive: boolean) {
 }
 
 export async function deleteJobCard(id: string) {
-  const { error } = await supabase
+  console.log('[Supabase] Attempting to delete job card:', id);
+  
+  const { data, error } = await supabase
     .from('job_cards')
     .delete()
-    .eq('id', id);
-  if (error) console.error('Error deleting job card:', error);
-  return !error;
+    .eq('id', id)
+    .select();
+  
+  if (error) {
+    console.error('[Supabase] Error deleting job card:', error);
+    console.error('[Supabase] Error details:', JSON.stringify(error));
+    return false;
+  }
+  
+  console.log('[Supabase] Delete successful:', data);
+  return true;
 }
 
 // ============================================================================

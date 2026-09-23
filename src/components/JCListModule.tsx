@@ -72,12 +72,24 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
   }
 
   async function handleDeleteJC(id: string) {
+    console.log('[JCList] Delete button clicked for:', id);
+    
     if (!confirm('Are you sure you want to delete this job card? This action cannot be undone.')) {
+      console.log('[JCList] Delete cancelled by user');
       return;
     }
+    
+    console.log('[JCList] Calling deleteJobCard...');
     const success = await deleteJobCard(id);
+    console.log('[JCList] Delete result:', success);
+    
     if (success) {
+      console.log('[JCList] Removing from local state...');
       setJobCards(prev => prev.filter(jc => jc.id !== id));
+      console.log('[JCList] Job card deleted successfully');
+    } else {
+      console.error('[JCList] Failed to delete job card');
+      alert('Failed to delete job card. Please check the console for details.');
     }
   }
 
