@@ -15,7 +15,7 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
   const [newJC, setNewJC] = useState({ jobCardNumber: '', headName: '' });
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 50;
+  const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(200);
 
   useEffect(() => {
     loadJobCards();
@@ -68,7 +68,9 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
   );
 
   // Pagination
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const isAllRows = rowsPerPage === 'all';
+  const itemsPerPage = isAllRows ? filtered.length : rowsPerPage;
+  const totalPages = isAllRows ? 1 : Math.ceil(filtered.length / rowsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedCards = filtered.slice(startIndex, endIndex);
@@ -199,30 +201,55 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
       </div>
 
       {/* Pagination Controls */}
-      {totalPages > 1 && (
+      {filtered.length > 0 && (
         <div className="flex items-center justify-between bg-white rounded-xl border border-gray-100 px-4 py-3">
-          <div className="text-sm text-gray-600">
-            Showing {startIndex + 1}-{Math.min(endIndex, filtered.length)} of {filtered.length}
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-600">
+              {isAllRows ? (
+                `Showing all ${filtered.length} cards`
+              ) : (
+                `Showing ${startIndex + 1}-${Math.min(endIndex, filtered.length)} of ${filtered.length}`
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-gray-600">Rows per page:</label>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setRowsPerPage(value === 'all' ? 'all' : Number(value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={200}>200</option>
+                <option value="all">All</option>
+              </select>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-600">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
-          </div>
+          {!isAllRows && totalPages > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-600">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       )}
 
