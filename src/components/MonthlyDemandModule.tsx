@@ -23,6 +23,7 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(200);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -98,6 +99,15 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
       await updateDemandCreditStatus(demand.id, 'Pending', '');
     }
     
+    await loadData();
+  }
+
+  async function handleDeleteAll() {
+    // Delete all demands for current village/month/year
+    for (const demand of demands) {
+      await deleteMonthlyDemand(demand.id);
+    }
+    setShowDeleteAllConfirm(false);
     await loadData();
   }
 
@@ -237,7 +247,7 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                 {creditedCount > 0 && <span className="text-emerald-600">{creditedCount} credited</span>}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {pendingCount > 0 && (
                 <button
                   onClick={handleMarkAllCredited}
@@ -252,6 +262,15 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                   className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
                 >
                   Mark All as Pending
+                </button>
+              )}
+              {demands.length > 0 && (
+                <button
+                  onClick={() => setShowDeleteAllConfirm(true)}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete All
                 </button>
               )}
             </div>
@@ -431,6 +450,40 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
               >
                 Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Confirmation Modal */}
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete All Demands</h3>
+            <p className="text-sm text-gray-600 mb-2">
+              Are you sure you want to delete <strong>all {demands.length} demands</strong> for:
+            </p>
+            <p className="text-sm font-medium text-gray-800 mb-4">
+              {village} • {MONTHS.find(m => m.index === selectedMonth)?.fullLabel} {selectedYear}
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-red-700">
+                ⚠️ This action cannot be undone. All demand records for this month will be permanently deleted.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteAllConfirm(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAll}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+              >
+                Delete All
               </button>
             </div>
           </div>
