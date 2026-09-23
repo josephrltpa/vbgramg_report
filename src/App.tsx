@@ -125,7 +125,7 @@ function App() {
               </div>
               <div>
                 <h1 className="text-sm font-bold text-gray-900 leading-tight">MGNREGA VEC Portal</h1>
-                <p className="text-xs text-gray-500">{displayVillage} • {userRole === 'secretary' ? 'VEC Secretary' : 'Computer Assistant'}</p>
+                <p className="text-xs text-gray-500">{displayVillage} • {userRole === 'computer_assistant' ? 'Computer Assistant' : 'Login'}</p>
               </div>
             </div>
             
