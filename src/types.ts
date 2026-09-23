@@ -1,40 +1,93 @@
-export type ApprovalStatus = 'Approved' | 'Not Approved' | 'Pending';
-export type OfficeAction = 'Added to Portal' | 'Pending' | 'Rejected';
-export type RequestType = 'Add New' | 'Delete' | 'Correction';
-export type ProcessingStage = 'Generated' | 'FTO Signed' | 'Processed' | 'Credited';
+export type RequestType = 'Add New JC' | 'Delete JC' | 'Correction';
+export type RequestStatus = 'Submitted' | 'In Progress' | 'Completed' | 'Rejected';
 export type CreditStatus = 'Credited' | 'Pending';
 
-export interface JobCardRecord {
+export interface District {
   id: string;
-  slNo: number;
-  jobCardNumber: string;
-  headName: string;
-  remarks: RequestType;
-  requestDate: string;
-  approvalStatus: ApprovalStatus;
-  officeAction: OfficeAction;
-  village: string;
-  createdAt: string;
+  name: string;
+  state: string;
 }
 
-export interface FinancialRecord {
+export interface Block {
   id: string;
-  demandId: string;
-  workName: string;
-  amountCredited: number;
-  creditStatus: CreditStatus;
-  creditDate: string;
-  attachmentLink: string;
-  processingStage: ProcessingStage;
-  month: number; // 1-12 representing April(4) to March(3)
-  village: string;
-  createdAt: string;
+  name: string;
+  district_id: string;
+  district_name?: string;
 }
 
 export interface Village {
   id: string;
   name: string;
-  block: string;
+  block_id: string;
+  block_name?: string;
+  district_name?: string;
+}
+
+export interface User {
+  username: string;
+  village: string;
+  role: 'secretary' | 'computer_assistant';
+}
+
+export interface JobCard {
+  id: string;
+  jobCardNumber: string;
+  headName: string;
+  village: string;
+  createdAt: string;
+  isActive: boolean;
+}
+
+export interface JCRequest {
+  id: string;
+  jobCardNumber: string;
+  headName: string;
+  village: string;
+  requestType: RequestType;
+  remarks: string;
+  requestDate: string;
+  status: RequestStatus;
+  feedback: string;
+  actionDate: string;
+  requestedBy: string;
+  processedBy: string;
+}
+
+export interface MonthlyDemand {
+  id: string;
+  jobCardId: string;
+  jobCardNumber: string;
+  headName: string;
+  village: string;
+  month: number; // 1-12
+  year: number;
+  daysWorked: number;
+  wageAmount: number;
+  creditStatus: CreditStatus;
+  creditDate: string;
+  wagelistLink: string;
+  createdAt: string;
+}
+
+export interface District {
+  id: string;
+  name: string;
+  state: string;
+}
+
+export interface Block {
+  id: string;
+  name: string;
+  district_id: string;
+  district_name?: string;
+}
+
+export interface Village {
+  id: string;
+  name: string;
+  block_id: string;
+  block_name?: string;
+  district_name?: string;
 }
 
 export const MONTHS = [
@@ -51,3 +104,5 @@ export const MONTHS = [
   { label: 'Feb', fullLabel: 'February', index: 2 },
   { label: 'Mar', fullLabel: 'March', index: 3 },
 ];
+
+export const VILLAGES = ['Rampur', 'Sundarpur', 'Kishangarh', 'Devgarh', 'Chandpur'];

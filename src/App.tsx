@@ -1,36 +1,116 @@
-import { useState, useEffect } from 'react';
-import { ClipboardList, TrendingUp, Menu, X } from 'lucide-react';
-import { JobCardRecord, FinancialRecord } from './types';
-import { generateMockJobCards, generateMockFinancialRecords } from './data/mockData';
-import { useLocalStorage } from './hooks/useLocalStorage';
-import JobCardModule from './components/JobCardModule';
-import FinancialTrackerModule from './components/FinancialTrackerModule';
+import { useState } from 'react';
+import { ClipboardList, MessageSquare, CalendarDays, LogOut, Menu, X } from 'lucide-react';
+import Login from './components/Login';
+import JCListModule from './components/JCListModule';
+import JCRequestModule from './components/JCRequestModule';
+import MonthlyDemandModule from './components/MonthlyDemandModule';
+import LocationSelector from './components/LocationSelector';
 
-type Module = 'jobcards' | 'financial';
+type Tab = 'jclist' | 'requests' | 'demands';
 
 function App() {
-  const [activeModule, setActiveModule] = useState<Module>('jobcards');
+  const [currentUser, setCurrentUser] = useState<string | null>(() => {
+    return localStorage.getItem('mgnrega_user');
+  });
+  const [userVillage, setUserVillage] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_user_village') || '';
+  });
+  const [userRole, setUserRole] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_user_role') || 'secretary';
+  });
+  const [activeTab, setActiveTab] = useState<Tab>('jclist');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const [jobCards, setJobCards] = useLocalStorage<JobCardRecord[]>(
-    'mgnrega-jobcards',
-    generateMockJobCards()
-  );
-
-  const [financialRecords, setFinancialRecords] = useLocalStorage<FinancialRecord[]>(
-    'mgnrega-financial',
-    generateMockFinancialRecords()
-  );
-
-  // Initialize mock data on first load
-  useEffect(() => {
-    if (jobCards.length === 0) {
-      setJobCards(generateMockJobCards());
+  const [refreshKey, setRefreshKey] = useState(0);
+  
+  // Hierarchical location state - store both ID and name
+  const [selectedDistrictId, setSelectedDistrictId] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_district_id') || '';
+  });
+  const [selectedDistrictName, setSelectedDistrictName] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_district_name') || '';
+  });
+  const [selectedBlockId, setSelectedBlockId] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_block_id') || '';
+  });
+  const [selectedBlockName, setSelectedBlockName] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_block_name') || '';
+  });
+  const [selectedVillage, setSelectedVillage] = useState<string>(() => {
+    return localStorage.getItem('mgnrega_selected_village') || '';
+  });
+  
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    // Force reload when switching to JC List tab
+    if (tab === 'jclist') {
+      setRefreshKey(prev => prev + 1);
     }
-    if (financialRecords.length === 0) {
-      setFinancialRecords(generateMockFinancialRecords());
-    }
-  }, []);
+  };
+  
+  const handleDistrictChange = (districtId: string, districtName: string) => {
+    setSelectedDistrictId(districtId);
+    setSelectedDistrictName(districtName);
+    localStorage.setItem('mgnrega_selected_district_id', districtId);
+    localStorage.setItem('mgnrega_selected_district_name', districtName);
+    setRefreshKey(prev => prev + 1);
+  };
+  
+  const handleBlockChange = (blockId: string, blockName: string) => {
+    setSelectedBlockId(blockId);
+    setSelectedBlockName(blockName);
+    localStorage.setItem('mgnrega_selected_block_id', blockId);
+    localStorage.setItem('mgnrega_selected_block_name', blockName);
+    setRefreshKey(prev => prev + 1);
+  };
+  
+  const handleVillageChange = (village: string) => {
+    setSelectedVillage(village);
+    localStorage.setItem('mgnrega_selected_village', village);
+    setRefreshKey(prev => prev + 1);
+  };
+
+  const handleLogin = (username: string, village: string) => {
+    localStorage.setItem('mgnrega_user', username);
+    localStorage.setItem('mgnrega_user_village', village);
+    
+    // Determine role based on username
+    const role = username === 'admin' ? 'computer_assistant' : 'secretary';
+    localStorage.setItem('mgnrega_user_role', role);
+    
+    setCurrentUser(username);
+    setUserVillage(village);
+    setUserRole(role);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('mgnrega_user');
+    localStorage.removeItem('mgnrega_user_village');
+    localStorage.removeItem('mgnrega_user_role');
+    setCurrentUser(null);
+    setUserVillage('');
+    setUserRole('secretary');
+  };
+
+  // Not logged in - show login
+  if (!currentUser) {
+    return <Login onLogin={handleLogin} />;
+  }
+  
+  // For admin, use selectedVillage. For secretary, use their assigned village.
+  const village = userRole === 'computer_assistant' ? selectedVillage : userVillage;
+  
+  // Build display string for location hierarchy
+  const displayVillage = userRole === 'computer_assistant'
+    ? (selectedVillage 
+        ? `${selectedVillage}${selectedBlockName ? ` • ${selectedBlockName}` : ''}${selectedDistrictName ? ` • ${selectedDistrictName}` : ''}`
+        : 'Select Location')
+    : userVillage || 'Village';
+
+  const tabs: { id: Tab; label: string; icon: any }[] = [
+    { id: 'jclist', label: 'JC List', icon: ClipboardList },
+    { id: 'requests', label: 'Requests', icon: MessageSquare },
+    { id: 'demands', label: 'Demands', icon: CalendarDays },
+  ];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -41,77 +121,106 @@ function App() {
             {/* Logo */}
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                <span className="text-white text-sm font-bold">M</span>
+                <span className="text-white text-sm font-bold">V</span>
               </div>
-              <div className="hidden sm:block">
-                <h1 className="text-base font-bold text-gray-900 leading-tight">MGNREGA</h1>
-                <p className="text-xs text-gray-500">Rural Employment Records</p>
+              <div>
+                <h1 className="text-sm font-bold text-gray-900 leading-tight">VBGRAMG VEC Portal</h1>
+                <p className="text-xs text-gray-500">{displayVillage} • {userRole === 'computer_assistant' ? 'Computer Assistant' : 'Login'}</p>
               </div>
-              <h1 className="sm:hidden text-sm font-bold text-gray-900">MGNREGA</h1>
             </div>
+            
+            {/* Location Selector for Admin */}
+            {userRole === 'computer_assistant' && (
+              <div className="flex items-center gap-2">
+                <LocationSelector
+                  selectedDistrict={selectedDistrictId}
+                  selectedBlock={selectedBlockId}
+                  selectedVillage={selectedVillage}
+                  onDistrictChange={handleDistrictChange}
+                  onBlockChange={handleBlockChange}
+                  onVillageChange={handleVillageChange}
+                />
+              </div>
+            )}
 
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+            {/* Desktop Nav */}
+            <nav className="hidden md:flex items-center gap-1">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-indigo-50 text-indigo-700'
+                        : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {tab.label}
+                  </button>
+                );
+              })}
               <button
-                onClick={() => setActiveModule('jobcards')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  activeModule === 'jobcards'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                onClick={handleLogout}
+                className="ml-2 flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-red-600 rounded-lg"
               >
-                <ClipboardList className="w-4 h-4" />
-                Job Cards
-              </button>
-              <button
-                onClick={() => setActiveModule('financial')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  activeModule === 'financial'
-                    ? 'bg-white text-indigo-700 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <TrendingUp className="w-4 h-4" />
-                Financial Tracker
+                <LogOut className="w-4 h-4" />
+                Logout
               </button>
             </nav>
 
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 active:scale-95"
+              className="md:hidden w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
 
-          {/* Mobile Navigation Dropdown */}
+          {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <div className="md:hidden mt-3 pb-2 border-t border-gray-100 pt-3">
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => { setActiveModule('jobcards'); setMobileMenuOpen(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all min-h-[48px] ${
-                    activeModule === 'jobcards'
-                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                      : 'text-gray-600 bg-gray-50'
-                  }`}
-                >
-                  <ClipboardList className="w-5 h-5" />
-                  Job Card Management
-                </button>
-                <button
-                  onClick={() => { setActiveModule('financial'); setMobileMenuOpen(false); }}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all min-h-[48px] ${
-                    activeModule === 'financial'
-                      ? 'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                      : 'text-gray-600 bg-gray-50'
-                  }`}
-                >
-                  <TrendingUp className="w-5 h-5" />
-                  Financial Year Tracker
-                </button>
-              </div>
+            <div className="md:hidden mt-3 pb-2 border-t border-gray-100 pt-3 space-y-2">
+              {/* Location Selector for Admin - Mobile */}
+              {userRole === 'computer_assistant' && (
+                <div className="px-4 py-2 space-y-3">
+                  <LocationSelector
+                    selectedDistrict={selectedDistrictId}
+                    selectedBlock={selectedBlockId}
+                    selectedVillage={selectedVillage}
+                    onDistrictChange={handleDistrictChange}
+                    onBlockChange={handleBlockChange}
+                    onVillageChange={handleVillageChange}
+                  />
+                </div>
+              )}
+              
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => { handleTabChange(tab.id); setMobileMenuOpen(false); }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium min-h-[48px] ${
+                      activeTab === tab.id
+                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                        : 'text-gray-600 bg-gray-50'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 bg-red-50 min-h-[48px]"
+              >
+                <LogOut className="w-5 h-5" />
+                Logout
+              </button>
             </div>
           )}
         </div>
@@ -119,58 +228,38 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-4 pb-24">
-        {/* Module Title */}
-        <div className="mb-4">
-          <h2 className="text-lg font-bold text-gray-900">
-            {activeModule === 'jobcards' ? 'Job Card Management' : 'Financial Year Tracker'}
-          </h2>
-          <p className="text-xs text-gray-500 mt-0.5">
-            {activeModule === 'jobcards'
-              ? 'FY 2024-25 • Village-wise JC requests & approvals'
-              : 'FY 2024-25 (April – March) • Wage demands & credit tracking'
-            }
-          </p>
-        </div>
-
-        {/* Module Content */}
-        {activeModule === 'jobcards' ? (
-          <JobCardModule records={jobCards} setRecords={setJobCards} />
-        ) : (
-          <FinancialTrackerModule records={financialRecords} setRecords={setFinancialRecords} />
+        {activeTab === 'jclist' && (
+          <JCListModule key={refreshKey} village={village} userRole={userRole} />
+        )}
+        {activeTab === 'requests' && (
+          <JCRequestModule village={village} username={currentUser} userRole={userRole} />
+        )}
+        {activeTab === 'demands' && (
+          <MonthlyDemandModule village={village} userRole={userRole} />
         )}
       </main>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 z-30">
         <div className="flex items-center justify-around py-2 px-4">
-          <button
-            onClick={() => setActiveModule('jobcards')}
-            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl min-w-[80px] min-h-[56px] transition-all ${
-              activeModule === 'jobcards'
-                ? 'text-indigo-600'
-                : 'text-gray-400'
-            }`}
-          >
-            <ClipboardList className={`w-5 h-5 ${activeModule === 'jobcards' ? 'stroke-[2.5px]' : ''}`} />
-            <span className="text-[10px] font-semibold">Job Cards</span>
-            {activeModule === 'jobcards' && (
-              <div className="absolute bottom-0 w-8 h-0.5 bg-indigo-600 rounded-full" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveModule('financial')}
-            className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl min-w-[80px] min-h-[56px] transition-all ${
-              activeModule === 'financial'
-                ? 'text-indigo-600'
-                : 'text-gray-400'
-            }`}
-          >
-            <TrendingUp className={`w-5 h-5 ${activeModule === 'financial' ? 'stroke-[2.5px]' : ''}`} />
-            <span className="text-[10px] font-semibold">Financial</span>
-            {activeModule === 'financial' && (
-              <div className="absolute bottom-0 w-8 h-0.5 bg-indigo-600 rounded-full" />
-            )}
-          </button>
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl min-w-[70px] min-h-[56px] relative ${
+                  activeTab === tab.id ? 'text-indigo-600' : 'text-gray-400'
+                }`}
+              >
+                <Icon className={`w-5 h-5 ${activeTab === tab.id ? 'stroke-[2.5px]' : ''}`} />
+                <span className="text-[10px] font-semibold">{tab.label}</span>
+                {activeTab === tab.id && (
+                  <div className="absolute bottom-0 w-8 h-0.5 bg-indigo-600 rounded-full" />
+                )}
+              </button>
+            );
+          })}
         </div>
       </nav>
     </div>
