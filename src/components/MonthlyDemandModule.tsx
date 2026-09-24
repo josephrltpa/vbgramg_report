@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, FileText, Check, X, Upload, Download, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { JobCard, MonthlyDemand, MONTHS, CreditStatus } from '../types';
 import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, deleteVillageWagelist, VillageWagelist } from '../lib/services';
-import { uploadWagelistFile, deleteWagelistFile } from '../lib/storage';
+import { uploadWagelistFile, deleteWagelistFile, viewHtmlFile, downloadFile } from '../lib/storage';
 import { parseExcelFile, importMonthlyDemands, ImportResult } from '../lib/excelImport';
 
 interface MonthlyDemandModuleProps {
@@ -175,22 +175,36 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
       return;
     }
     
+    console.log('Starting delete process for:', villageWagelist);
     setUploadingWagelist(true);
     
-    // Delete file from storage
-    if (villageWagelist.wagelistLink) {
-      await deleteWagelistFile(villageWagelist.wagelistLink);
-    }
-    
-    // Delete record from database
-    const success = await deleteVillageWagelist(
-      village,
-      selectedMonth,
-      selectedYear
-    );
-    
-    if (success) {
-      setVillageWagelist(null);
+    try {
+      // Delete file from storage
+      if (villageWagelist.wagelistLink) {
+        console.log('Deleting file from storage:', villageWagelist.wagelistLink);
+        const storageDeleted = await deleteWagelistFile(villageWagelist.wagelistLink);
+        console.log('Storage delete result:', storageDeleted);
+      }
+      
+      // Delete record from database
+      console.log('Deleting record from database:', { village, month: selectedMonth, year: selectedYear });
+      const success = await deleteVillageWagelist(
+        village,
+        selectedMonth,
+        selectedYear
+      );
+      console.log('Database delete result:', success);
+      
+      if (success) {
+        setVillageWagelist(null);
+        console.log('Wagelist deleted successfully');
+      } else {
+        console.error('Failed to delete wagelist from database');
+        alert('Failed to delete wagelist. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error during delete:', error);
+      alert('An error occurred while deleting. Please try again.');
     }
     
     setUploadingWagelist(false);
@@ -348,39 +362,24 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
             <div className="flex gap-2">
               <button
                 onClick={() => {
-                  const newWindow = window.open('', '_blank');
-                  if (newWindow) {
-                    newWindow.document.write(`
-                      <!DOCTYPE html>
-                      <html>
-                        <head>
-                          <title>Wagelist - ${village}</title>
-                          <style>
-                            body { margin: 0; padding: 0; }
-                            iframe { width: 100%; height: 100vh; border: none; }
-                          </style>
-                        </head>
-                        <body>
-                          <iframe src="${villageWagelist.wagelistLink}"></iframe>
-                        </body>
-                      </html>
-                    `);
-                    newWindow.document.close();
-                  }
+                  const fileName = villageWagelist.wagelistLink.split('/').pop() || 'wagelist';
+                  viewHtmlFile(villageWagelist.wagelistLink, `Wagelist - ${village} - ${MONTHS.find(m => m.index === selectedMonth)?.fullLabel} ${selectedYear}`);
                 }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
               >
                 <Download className="w-4 h-4" />
                 View Wagelist
               </button>
-              <a
-                href={villageWagelist.wagelistLink}
-                download
+              <button
+                onClick={() => {
+                  const fileName = villageWagelist.wagelistLink.split('/').pop() || 'wagelist';
+                  downloadFile(villageWagelist.wagelistLink, fileName);
+                }}
                 className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
               >
                 <Download className="w-4 h-4" />
                 Download
-              </a>
+              </button>
             </div>
           )}
         </div>
@@ -401,39 +400,23 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
-                      const newWindow = window.open('', '_blank');
-                      if (newWindow) {
-                        newWindow.document.write(`
-                          <!DOCTYPE html>
-                          <html>
-                            <head>
-                              <title>Wagelist - ${village}</title>
-                              <style>
-                                body { margin: 0; padding: 0; }
-                                iframe { width: 100%; height: 100vh; border: none; }
-                              </style>
-                            </head>
-                            <body>
-                              <iframe src="${villageWagelist.wagelistLink}"></iframe>
-                            </body>
-                          </html>
-                        `);
-                        newWindow.document.close();
-                      }
+                      viewHtmlFile(villageWagelist.wagelistLink, `Wagelist - ${village} - ${MONTHS.find(m => m.index === selectedMonth)?.fullLabel} ${selectedYear}`);
                     }}
                     className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     View
                   </button>
-                  <a
-                    href={villageWagelist.wagelistLink}
-                    download
+                  <button
+                    onClick={() => {
+                      const fileName = villageWagelist.wagelistLink.split('/').pop() || 'wagelist';
+                      downloadFile(villageWagelist.wagelistLink, fileName);
+                    }}
                     className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     Download
-                  </a>
+                  </button>
                   {userRole === 'computer_assistant' && (
                     <button
                       onClick={handleDeleteVillageWagelist}

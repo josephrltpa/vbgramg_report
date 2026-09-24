@@ -59,6 +59,8 @@ export async function uploadWagelistFile(
  */
 export async function deleteWagelistFile(fileUrl: string): Promise<boolean> {
   try {
+    console.log('Deleting file:', fileUrl);
+    
     // Extract file path from URL
     const urlParts = fileUrl.split('/storage/v1/object/public/wagelists/');
     if (urlParts.length < 2) {
@@ -67,8 +69,9 @@ export async function deleteWagelistFile(fileUrl: string): Promise<boolean> {
     }
 
     const filePath = urlParts[1];
+    console.log('File path to delete:', filePath);
 
-    const { error } = await supabase.storage
+    const { data, error } = await supabase.storage
       .from('wagelists')
       .remove([filePath]);
 
@@ -77,9 +80,74 @@ export async function deleteWagelistFile(fileUrl: string): Promise<boolean> {
       return false;
     }
 
+    console.log('File deleted successfully:', data);
     return true;
   } catch (error) {
     console.error('Error in deleteWagelistFile:', error);
     return false;
   }
+}
+
+// Fetch file content as blob
+export async function fetchFileAsBlob(fileUrl: string): Promise<Blob | null> {
+  try {
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error('Failed to fetch file');
+    }
+    return await response.blob();
+  } catch (error) {
+    console.error('Error fetching file:', error);
+    return null;
+  }
+}
+
+// View HTML file in new window
+export function viewHtmlFile(fileUrl: string, title: string) {
+  fetch(fileUrl)
+    .then(response => response.text())
+    .then(htmlContent => {
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title>${title}</title>
+              <style>
+                body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+              </style>
+            </head>
+            <body>
+              ${htmlContent}
+            </body>
+          </html>
+        `);
+        newWindow.document.close();
+      }
+    })
+    .catch(error => {
+      console.error('Error viewing HTML:', error);
+      alert('Failed to load HTML file. Please try downloading instead.');
+    });
+}
+
+// Download file
+export function downloadFile(fileUrl: string, fileName: string) {
+  fetch(fileUrl)
+    .then(response => response.blob())
+    .then(blob => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    })
+    .catch(error => {
+      console.error('Error downloading file:', error);
+      alert('Failed to download file. Please try again.');
+    });
 }
