@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, FileText, Check, X, Upload, Download, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { JobCard, MonthlyDemand, MONTHS, CreditStatus } from '../types';
-import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, VillageWagelist } from '../lib/services';
+import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, deleteVillageWagelist, VillageWagelist } from '../lib/services';
 import { uploadWagelistFile, deleteWagelistFile } from '../lib/storage';
 import { parseExcelFile, importMonthlyDemands, ImportResult } from '../lib/excelImport';
 
@@ -163,6 +163,34 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
           fileInputRef.current.value = '';
         }
       }
+    }
+    
+    setUploadingWagelist(false);
+  }
+
+  async function handleDeleteVillageWagelist() {
+    if (!villageWagelist) return;
+    
+    if (!window.confirm('Are you sure you want to delete this wagelist? This action cannot be undone.')) {
+      return;
+    }
+    
+    setUploadingWagelist(true);
+    
+    // Delete file from storage
+    if (villageWagelist.wagelistLink) {
+      await deleteWagelistFile(villageWagelist.wagelistLink);
+    }
+    
+    // Delete record from database
+    const success = await deleteVillageWagelist(
+      village,
+      selectedMonth,
+      selectedYear
+    );
+    
+    if (success) {
+      setVillageWagelist(null);
     }
     
     setUploadingWagelist(false);
@@ -342,15 +370,39 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                     </p>
                   </div>
                 </div>
-                <a
-                  href={villageWagelist.wagelistLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
-                >
-                  <Download className="w-4 h-4" />
-                  View
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={villageWagelist.wagelistLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    View
+                  </a>
+                  {userRole === 'computer_assistant' && (
+                    <button
+                      onClick={handleDeleteVillageWagelist}
+                      disabled={uploadingWagelist}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {uploadingWagelist ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                          </svg>
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
             

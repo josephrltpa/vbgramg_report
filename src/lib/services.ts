@@ -431,6 +431,26 @@ export async function fetchVillageWagelist(
   };
 }
 
+export async function deleteVillageWagelist(
+  village: string,
+  month: number,
+  year: number
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('village_wagelists')
+    .delete()
+    .eq('village', village)
+    .eq('month', month)
+    .eq('year', year);
+  
+  if (error) {
+    console.error('Error deleting village wagelist:', error);
+    return false;
+  }
+  
+  return true;
+}
+
 export async function uploadVillageWagelist(
   village: string,
   month: number,
