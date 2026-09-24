@@ -345,15 +345,43 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
             </p>
           </div>
           {villageWagelist && (
-            <a
-              href={villageWagelist.wagelistLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Download Wagelist
-            </a>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const newWindow = window.open('', '_blank');
+                  if (newWindow) {
+                    newWindow.document.write(`
+                      <!DOCTYPE html>
+                      <html>
+                        <head>
+                          <title>Wagelist - ${village}</title>
+                          <style>
+                            body { margin: 0; padding: 0; }
+                            iframe { width: 100%; height: 100vh; border: none; }
+                          </style>
+                        </head>
+                        <body>
+                          <iframe src="${villageWagelist.wagelistLink}"></iframe>
+                        </body>
+                      </html>
+                    `);
+                    newWindow.document.close();
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                View Wagelist
+              </button>
+              <a
+                href={villageWagelist.wagelistLink}
+                download
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </a>
+            </div>
           )}
         </div>
         
@@ -371,14 +399,40 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <a
-                    href={villageWagelist.wagelistLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => {
+                      const newWindow = window.open('', '_blank');
+                      if (newWindow) {
+                        newWindow.document.write(`
+                          <!DOCTYPE html>
+                          <html>
+                            <head>
+                              <title>Wagelist - ${village}</title>
+                              <style>
+                                body { margin: 0; padding: 0; }
+                                iframe { width: 100%; height: 100vh; border: none; }
+                              </style>
+                            </head>
+                            <body>
+                              <iframe src="${villageWagelist.wagelistLink}"></iframe>
+                            </body>
+                          </html>
+                        `);
+                        newWindow.document.close();
+                      }
+                    }}
                     className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     View
+                  </button>
+                  <a
+                    href={villageWagelist.wagelistLink}
+                    download
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
                   </a>
                   {userRole === 'computer_assistant' && (
                     <button
