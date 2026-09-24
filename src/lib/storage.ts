@@ -15,30 +15,38 @@ export async function uploadWagelistFile(
   year: number
 ): Promise<string | null> {
   try {
-    // Create a unique file path
+    console.log('Starting file upload...', { file: file.name, size: file.size, village, month, year });
+    
+    // Create a unique file path (without the bucket name prefix)
     const fileExt = file.name.split('.').pop();
     const fileName = `${village}_${year}_${month}_${Date.now()}.${fileExt}`;
-    const filePath = `wagelists/${village}/${year}/${month}/${fileName}`;
+    const filePath = `${village}/${year}/${month}/${fileName}`;
+
+    console.log('Uploading to path:', filePath);
 
     // Upload to Supabase Storage
-    const { error: uploadError } = await supabase.storage
+    const { data, error: uploadError } = await supabase.storage
       .from('wagelists')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: false
+        upsert: true
       });
 
     if (uploadError) {
       console.error('Error uploading file:', uploadError);
+      console.error('Upload error details:', JSON.stringify(uploadError, null, 2));
       return null;
     }
 
+    console.log('Upload successful:', data);
+
     // Get public URL
-    const { data } = supabase.storage
+    const { data: urlData } = supabase.storage
       .from('wagelists')
       .getPublicUrl(filePath);
 
-    return data.publicUrl;
+    console.log('Public URL:', urlData.publicUrl);
+    return urlData.publicUrl;
   } catch (error) {
     console.error('Error in uploadWagelistFile:', error);
     return null;
