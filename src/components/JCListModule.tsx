@@ -12,6 +12,7 @@ interface JCListModuleProps {
 export default function JCListModule({ village, userRole }: JCListModuleProps) {
   const [jobCards, setJobCards] = useState<JobCard[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newJC, setNewJC] = useState({ jobCardNumber: '', headName: '' });
   const [loading, setLoading] = useState(true);
@@ -35,6 +36,7 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
     
     setJobCards(sorted);
     setCurrentPage(1); // Reset to first page
+    setStatusFilter('all'); // Reset status filter
     setLoading(false);
   }
 
@@ -142,10 +144,18 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
     setDeletingId(null);
   }
 
-  const filtered = jobCards.filter(jc =>
-    jc.headName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    jc.jobCardNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = jobCards.filter(jc => {
+    // Search filter
+    const matchesSearch = jc.headName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      jc.jobCardNumber.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'active' && jc.isActive) ||
+      (statusFilter === 'inactive' && !jc.isActive);
+    
+    return matchesSearch && matchesStatus;
+  });
 
   // Pagination
   const isAllRows = rowsPerPage === 'all';
@@ -281,16 +291,60 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
         </form>
       )}
 
-      {/* Search */}
-      <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5">
-        <Search className="w-4 h-4 text-gray-400" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by name or JC number..."
-          className="flex-1 text-sm outline-none bg-transparent"
-        />
+      {/* Search and Filters */}
+      <div className="space-y-3">
+        {/* Search Bar */}
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2.5">
+          <Search className="w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by name or JC number..."
+            className="flex-1 text-sm outline-none bg-transparent"
+          />
+        </div>
+
+        {/* Status Filter */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-gray-600">Filter:</span>
+          <button
+            onClick={() => setStatusFilter('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              statusFilter === 'all'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            All ({jobCards.length})
+          </button>
+          <button
+            onClick={() => setStatusFilter('active')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              statusFilter === 'active'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" />
+              Active ({jobCards.filter(jc => jc.isActive).length})
+            </span>
+          </button>
+          <button
+            onClick={() => setStatusFilter('inactive')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+              statusFilter === 'inactive'
+                ? 'bg-gray-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <span className="flex items-center gap-1">
+              <XCircle className="w-3 h-3" />
+              Inactive ({jobCards.filter(jc => !jc.isActive).length})
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Desktop Table */}

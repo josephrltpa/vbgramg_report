@@ -51,12 +51,19 @@ export default function Login({ onLogin }: LoginProps) {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    const user = USERS.find(u => u.username === username && u.password === password);
+    // Convert to lowercase for case-insensitive comparison
+    const normalizedUsername = username.toLowerCase().trim();
+    const normalizedPassword = password.toLowerCase().trim();
+    
+    const user = USERS.find(u => 
+      u.username.toLowerCase() === normalizedUsername && 
+      u.password.toLowerCase() === normalizedPassword
+    );
     
     if (user) {
       onLogin(user.username, user.village);
     } else {
-      setError('Invalid username or password');
+      setError('Invalid username or password. Please check and try again.');
     }
   };
 
@@ -84,6 +91,10 @@ export default function Login({ onLogin }: LoginProps) {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter username"
                 className="flex-1 outline-none text-sm"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="username"
+                spellCheck={false}
                 required
               />
             </div>
@@ -99,6 +110,9 @@ export default function Login({ onLogin }: LoginProps) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
                 className="flex-1 outline-none text-sm"
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="current-password"
                 required
               />
             </div>
