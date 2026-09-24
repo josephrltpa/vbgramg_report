@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, FileText, Check, X, Upload, Download, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { JobCard, MonthlyDemand, MONTHS, CreditStatus } from '../types';
-import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, updateDemandWagelistLink, deleteMonthlyDemand } from '../lib/services';
+import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, deleteVillageWagelist, VillageWagelist } from '../lib/services';
+import { uploadWagelistFile, deleteWagelistFile, viewHtmlFile, downloadFile } from '../lib/storage';
 import { parseExcelFile, importMonthlyDemands, ImportResult } from '../lib/excelImport';
 
 interface MonthlyDemandModuleProps {
@@ -29,6 +30,10 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   const [deletingAll, setDeletingAll] = useState(false);
   const [togglingCredit, setTogglingCredit] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [villageWagelist, setVillageWagelist] = useState<VillageWagelist | null>(null);
+  const [uploadingWagelist, setUploadingWagelist] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -36,12 +41,14 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
 
   async function loadData() {
     setLoading(true);
-    const [jcs, dems] = await Promise.all([
+    const [jcs, dems, wagelist] = await Promise.all([
       fetchJobCards(village),
       fetchMonthlyDemands(village, selectedMonth, selectedYear),
+      fetchVillageWagelist(village, selectedMonth, selectedYear),
     ]);
     setJobCards(jcs);
     setDemands(dems);
+    setVillageWagelist(wagelist);
     setCurrentPage(1);
     setLoading(false);
   }
@@ -73,11 +80,6 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     await updateDemandCreditStatus(demand.id, newStatus, creditDate);
     await loadData();
     setTogglingCredit(null);
-  }
-
-  async function handleUpdateWagelist(id: string, link: string) {
-    await updateDemandWagelistLink(id, link);
-    await loadData();
   }
 
   async function handleDelete(id: string) {
@@ -126,6 +128,88 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     setDeletingAll(false);
   }
 
+  async function handleUploadVillageWagelist() {
+    if (!selectedFile) return;
+    
+    setUploadingWagelist(true);
+    
+    // Upload file to storage
+    const fileUrl = await uploadWagelistFile(
+      selectedFile,
+      village,
+      selectedMonth,
+      selectedYear
+    );
+    
+    if (fileUrl) {
+      // If there's an existing wagelist, delete the old file
+      if (villageWagelist?.wagelistLink) {
+        await deleteWagelistFile(villageWagelist.wagelistLink);
+      }
+      
+      // Save the new file URL to database
+      const result = await uploadVillageWagelist(
+        village,
+        selectedMonth,
+        selectedYear,
+        fileUrl,
+        userRole === 'computer_assistant' ? 'admin' : village
+      );
+      
+      if (result) {
+        setVillageWagelist(result);
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    }
+    
+    setUploadingWagelist(false);
+  }
+
+  async function handleDeleteVillageWagelist() {
+    if (!villageWagelist) return;
+    
+    if (!window.confirm('Are you sure you want to delete this wagelist? This action cannot be undone.')) {
+      return;
+    }
+    
+    console.log('Starting delete process for:', villageWagelist);
+    setUploadingWagelist(true);
+    
+    try {
+      // Delete file from storage
+      if (villageWagelist.wagelistLink) {
+        console.log('Deleting file from storage:', villageWagelist.wagelistLink);
+        const storageDeleted = await deleteWagelistFile(villageWagelist.wagelistLink);
+        console.log('Storage delete result:', storageDeleted);
+      }
+      
+      // Delete record from database
+      console.log('Deleting record from database:', { village, month: selectedMonth, year: selectedYear });
+      const success = await deleteVillageWagelist(
+        village,
+        selectedMonth,
+        selectedYear
+      );
+      console.log('Database delete result:', success);
+      
+      if (success) {
+        setVillageWagelist(null);
+        console.log('Wagelist deleted successfully');
+      } else {
+        console.error('Failed to delete wagelist from database');
+        alert('Failed to delete wagelist. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error during delete:', error);
+      alert('An error occurred while deleting. Please try again.');
+    }
+    
+    setUploadingWagelist(false);
+  }
+
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -158,10 +242,12 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     !demands.some(d => d.jobCardId === jc.id)
   );
 
-  const filtered = demands.filter(d =>
-    d.headName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    d.jobCardNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = demands
+    .filter(d =>
+      d.headName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      d.jobCardNumber.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => a.jobCardNumber.localeCompare(b.jobCardNumber));
 
   // Pagination
   const isAllRows = rowsPerPage === 'all';
@@ -261,6 +347,148 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
           <p className="text-xs text-amber-600">Pending</p>
           <p className="text-xl font-bold text-amber-900">{pendingCount}</p>
         </div>
+      </div>
+
+      {/* Village Wagelist Section */}
+      <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Village Wagelist</h3>
+            <p className="text-xs text-gray-500">
+              {MONTHS.find(m => m.index === selectedMonth)?.fullLabel} {selectedYear} • {village}
+            </p>
+          </div>
+          {villageWagelist && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  const fileName = villageWagelist.wagelistLink.split('/').pop() || 'wagelist';
+                  viewHtmlFile(villageWagelist.wagelistLink, `Wagelist - ${village} - ${MONTHS.find(m => m.index === selectedMonth)?.fullLabel} ${selectedYear}`);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                View Wagelist
+              </button>
+              <button
+                onClick={() => {
+                  const fileName = villageWagelist.wagelistLink.split('/').pop() || 'wagelist';
+                  downloadFile(villageWagelist.wagelistLink, fileName);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {userRole === 'computer_assistant' && (
+          <div className="space-y-3">
+            {villageWagelist && (
+              <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-emerald-600" />
+                  <div>
+                    <p className="text-sm font-medium text-emerald-900">Current wagelist uploaded</p>
+                    <p className="text-xs text-emerald-700">
+                      Uploaded on {new Date(villageWagelist.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      viewHtmlFile(villageWagelist.wagelistLink, `Wagelist - ${village} - ${MONTHS.find(m => m.index === selectedMonth)?.fullLabel} ${selectedYear}`);
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    View
+                  </button>
+                  <button
+                    onClick={() => {
+                      const fileName = villageWagelist.wagelistLink.split('/').pop() || 'wagelist';
+                      downloadFile(villageWagelist.wagelistLink, fileName);
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download
+                  </button>
+                  {userRole === 'computer_assistant' && (
+                    <button
+                      onClick={handleDeleteVillageWagelist}
+                      disabled={uploadingWagelist}
+                      className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {uploadingWagelist ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                          </svg>
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.xlsx,.xls,.html,.htm"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setSelectedFile(file);
+                  }
+                }}
+                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+              <button
+                onClick={handleUploadVillageWagelist}
+                disabled={uploadingWagelist || !selectedFile}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {uploadingWagelist ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    {villageWagelist ? 'Update' : 'Upload'}
+                  </>
+                )}
+              </button>
+            </div>
+            
+            {selectedFile && (
+              <p className="text-xs text-gray-600">
+                Selected: <span className="font-medium">{selectedFile.name}</span> ({(selectedFile.size / 1024).toFixed(1)} KB)
+              </p>
+            )}
+          </div>
+        )}
+        
+        {!villageWagelist && userRole !== 'computer_assistant' && (
+          <p className="text-xs text-gray-400 italic">No wagelist uploaded yet for this month</p>
+        )}
       </div>
 
       {/* Bulk Actions for Admin */}
@@ -393,7 +621,6 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Days</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Amount</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Status</th>
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Wagelist</th>
               {userRole === 'computer_assistant' && (
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500">Actions</th>
               )}
@@ -407,7 +634,6 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                 index={startIndex + idx + 1}
                 userRole={userRole}
                 onToggleCredit={handleToggleCredit}
-                onUpdateWagelist={handleUpdateWagelist}
                 onDelete={setDeleteConfirm}
                 isToggling={togglingCredit === demand.id}
                 isDeleting={deletingId === demand.id}
@@ -426,7 +652,6 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
             index={startIndex + idx + 1}
             userRole={userRole}
             onToggleCredit={handleToggleCredit}
-            onUpdateWagelist={handleUpdateWagelist}
             onDelete={setDeleteConfirm}
             isToggling={togglingCredit === demand.id}
             isDeleting={deletingId === demand.id}
@@ -668,7 +893,6 @@ function DemandRow({
   index,
   userRole,
   onToggleCredit,
-  onUpdateWagelist,
   onDelete,
   isToggling,
   isDeleting,
@@ -677,14 +901,10 @@ function DemandRow({
   index: number;
   userRole: string;
   onToggleCredit: (d: MonthlyDemand) => void;
-  onUpdateWagelist: (id: string, link: string) => void;
   onDelete: (id: string) => void;
   isToggling: boolean;
   isDeleting: boolean;
 }) {
-  const [editingLink, setEditingLink] = useState(false);
-  const [linkInput, setLinkInput] = useState(demand.wagelistLink);
-
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
   };
@@ -732,42 +952,6 @@ function DemandRow({
           </span>
         )}
       </td>
-      <td className="px-4 py-3">
-        {editingLink ? (
-          <div className="flex gap-1">
-            <input
-              type="url"
-              value={linkInput}
-              onChange={(e) => setLinkInput(e.target.value)}
-              placeholder="Paste link..."
-              className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 min-w-[150px]"
-            />
-            <button
-              onClick={() => { onUpdateWagelist(demand.id, linkInput); setEditingLink(false); }}
-              className="text-xs text-indigo-600 font-medium"
-            >
-              Save
-            </button>
-          </div>
-        ) : demand.wagelistLink ? (
-          <a
-            href={demand.wagelistLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-600 hover:underline text-xs flex items-center gap-1"
-          >
-            <Download className="w-3 h-3" />
-            View
-          </a>
-        ) : (
-          <button
-            onClick={() => setEditingLink(true)}
-            className="text-xs text-gray-400 hover:text-gray-600"
-          >
-            Add link
-          </button>
-        )}
-      </td>
       {userRole === 'computer_assistant' && (
         <td className="px-4 py-3">
           <button
@@ -796,7 +980,6 @@ function DemandCard({
   index,
   userRole,
   onToggleCredit,
-  onUpdateWagelist,
   onDelete,
   isToggling,
   isDeleting,
@@ -805,19 +988,15 @@ function DemandCard({
   index: number;
   userRole: string;
   onToggleCredit: (d: MonthlyDemand) => void;
-  onUpdateWagelist: (id: string, link: string) => void;
   onDelete: (id: string) => void;
   isToggling: boolean;
   isDeleting: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const [editingLink, setEditingLink] = useState(false);
-  const [linkInput, setLinkInput] = useState(demand.wagelistLink);
-
+  
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
   };
-
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4">
       <div className="flex items-start justify-between mb-2">
@@ -876,49 +1055,6 @@ function DemandCard({
             <span className="text-gray-500">Days Worked:</span>
             <span className="font-medium text-gray-700">{demand.daysWorked}</span>
           </div>
-
-          {editingLink ? (
-            <div className="space-y-2">
-              <input
-                type="url"
-                value={linkInput}
-                onChange={(e) => setLinkInput(e.target.value)}
-                placeholder="Paste wagelist link..."
-                className="w-full text-xs border border-gray-200 rounded px-2 py-1.5"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { onUpdateWagelist(demand.id, linkInput); setEditingLink(false); }}
-                  className="flex-1 text-xs bg-indigo-600 text-white py-1.5 rounded"
-                >
-                  Save
-                </button>
-                <button
-                  onClick={() => setEditingLink(false)}
-                  className="flex-1 text-xs bg-gray-200 text-gray-700 py-1.5 rounded"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          ) : demand.wagelistLink ? (
-            <a
-              href={demand.wagelistLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xs text-indigo-600 font-medium bg-indigo-50 rounded-lg px-3 py-2"
-            >
-              <Download className="w-4 h-4" />
-              View Wagelist
-            </a>
-          ) : (
-            <button
-              onClick={() => setEditingLink(true)}
-              className="w-full text-xs text-gray-400 hover:text-gray-600 text-left"
-            >
-              + Add wagelist link
-            </button>
-          )}
 
           {userRole === 'computer_assistant' && (
             <button
