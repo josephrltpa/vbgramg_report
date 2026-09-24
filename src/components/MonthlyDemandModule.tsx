@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, FileText, Check, X, Upload, Download, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { JobCard, MonthlyDemand, MONTHS, CreditStatus } from '../types';
 import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, VillageWagelist } from '../lib/services';
+import { uploadWagelistFile, deleteWagelistFile } from '../lib/storage';
 import { parseExcelFile, importMonthlyDemands, ImportResult } from '../lib/excelImport';
 
 interface MonthlyDemandModuleProps {
@@ -30,8 +31,9 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   const [togglingCredit, setTogglingCredit] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [villageWagelist, setVillageWagelist] = useState<VillageWagelist | null>(null);
-  const [wagelistLink, setWagelistLink] = useState('');
   const [uploadingWagelist, setUploadingWagelist] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -47,7 +49,6 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     setJobCards(jcs);
     setDemands(dems);
     setVillageWagelist(wagelist);
-    setWagelistLink(wagelist?.wagelistLink || '');
     setCurrentPage(1);
     setLoading(false);
   }
@@ -128,21 +129,42 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   }
 
   async function handleUploadVillageWagelist() {
-    if (!wagelistLink.trim()) return;
+    if (!selectedFile) return;
     
     setUploadingWagelist(true);
-    const result = await uploadVillageWagelist(
+    
+    // Upload file to storage
+    const fileUrl = await uploadWagelistFile(
+      selectedFile,
       village,
       selectedMonth,
-      selectedYear,
-      wagelistLink,
-      userRole === 'computer_assistant' ? 'admin' : village
+      selectedYear
     );
     
-    if (result) {
-      setVillageWagelist(result);
-      setWagelistLink(result.wagelistLink);
+    if (fileUrl) {
+      // If there's an existing wagelist, delete the old file
+      if (villageWagelist?.wagelistLink) {
+        await deleteWagelistFile(villageWagelist.wagelistLink);
+      }
+      
+      // Save the new file URL to database
+      const result = await uploadVillageWagelist(
+        village,
+        selectedMonth,
+        selectedYear,
+        fileUrl,
+        userRole === 'computer_assistant' ? 'admin' : village
+      );
+      
+      if (result) {
+        setVillageWagelist(result);
+        setSelectedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
     }
+    
     setUploadingWagelist(false);
   }
 
@@ -308,34 +330,70 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
         </div>
         
         {userRole === 'computer_assistant' && (
-          <div className="flex gap-2">
-            <input
-              type="url"
-              value={wagelistLink}
-              onChange={(e) => setWagelistLink(e.target.value)}
-              placeholder="Paste wagelist link (Google Drive, Dropbox, etc.)"
-              className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            />
-            <button
-              onClick={handleUploadVillageWagelist}
-              disabled={uploadingWagelist || !wagelistLink.trim()}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {uploadingWagelist ? (
-                <>
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                  </svg>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  {villageWagelist ? 'Update' : 'Upload'}
-                </>
-              )}
-            </button>
+          <div className="space-y-3">
+            {villageWagelist && (
+              <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-emerald-600" />
+                  <div>
+                    <p className="text-sm font-medium text-emerald-900">Current wagelist uploaded</p>
+                    <p className="text-xs text-emerald-700">
+                      Uploaded on {new Date(villageWagelist.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <a
+                  href={villageWagelist.wagelistLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  View
+                </a>
+              </div>
+            )}
+            
+            <div className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.xlsx,.xls,.html,.htm"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    setSelectedFile(file);
+                  }
+                }}
+                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+              <button
+                onClick={handleUploadVillageWagelist}
+                disabled={uploadingWagelist || !selectedFile}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {uploadingWagelist ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    {villageWagelist ? 'Update' : 'Upload'}
+                  </>
+                )}
+              </button>
+            </div>
+            
+            {selectedFile && (
+              <p className="text-xs text-gray-600">
+                Selected: <span className="font-medium">{selectedFile.name}</span> ({(selectedFile.size / 1024).toFixed(1)} KB)
+              </p>
+            )}
           </div>
         )}
         
