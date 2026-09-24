@@ -228,6 +228,31 @@ export async function updateJCRequest(id: string, updates: {
   if (error) console.error('Error updating request:', error);
 }
 
+export async function deleteJCRequest(id: string): Promise<boolean> {
+  // First delete associated comments
+  const { error: commentsError } = await supabase
+    .from('request_comments')
+    .delete()
+    .eq('request_id', id);
+  
+  if (commentsError) {
+    console.error('Error deleting request comments:', commentsError);
+  }
+
+  // Then delete the request
+  const { error } = await supabase
+    .from('jc_requests')
+    .delete()
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Error deleting request:', error);
+    return false;
+  }
+  
+  return true;
+}
+
 // ============================================================================
 // MONTHLY DEMANDS
 // ============================================================================
@@ -358,4 +383,117 @@ export async function addRequestComment(
   }
   
   return data;
+}
+
+// ============================================================================
+// VILLAGE WAGELISTS (Village-level wagelist upload/download)
+// ============================================================================
+export interface VillageWagelist {
+  id: string;
+  village: string;
+  month: number;
+  year: number;
+  wagelistLink: string;
+  uploadedBy: string;
+  createdAt: string;
+}
+
+export async function fetchVillageWagelist(
+  village: string,
+  month: number,
+  year: number
+): Promise<VillageWagelist | null> {
+  const { data, error } = await supabase
+    .from('village_wagelists')
+    .select('*')
+    .eq('village', village)
+    .eq('month', month)
+    .eq('year', year)
+    .single();
+  
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // No record found
+      return null;
+    }
+    console.error('Error fetching village wagelist:', error);
+    return null;
+  }
+  
+  return {
+    id: data.id,
+    village: data.village,
+    month: data.month,
+    year: data.year,
+    wagelistLink: data.wagelist_link,
+    uploadedBy: data.uploaded_by,
+    createdAt: data.created_at,
+  };
+}
+
+export async function uploadVillageWagelist(
+  village: string,
+  month: number,
+  year: number,
+  wagelistLink: string,
+  uploadedBy: string
+): Promise<VillageWagelist | null> {
+  // First check if a record exists
+  const existing = await fetchVillageWagelist(village, month, year);
+  
+  if (existing) {
+    // Update existing record
+    const { data, error } = await supabase
+      .from('village_wagelists')
+      .update({
+        wagelist_link: wagelistLink,
+        uploaded_by: uploadedBy,
+      })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating village wagelist:', error);
+      return null;
+    }
+    
+    return {
+      id: data.id,
+      village: data.village,
+      month: data.month,
+      year: data.year,
+      wagelistLink: data.wagelist_link,
+      uploadedBy: data.uploaded_by,
+      createdAt: data.created_at,
+    };
+  } else {
+    // Insert new record
+    const { data, error } = await supabase
+      .from('village_wagelists')
+      .insert({
+        village: village,
+        month: month,
+        year: year,
+        wagelist_link: wagelistLink,
+        uploaded_by: uploadedBy,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error inserting village wagelist:', error);
+      return null;
+    }
+    
+    return {
+      id: data.id,
+      village: data.village,
+      month: data.month,
+      year: data.year,
+      wagelistLink: data.wagelist_link,
+      uploadedBy: data.uploaded_by,
+      createdAt: data.created_at,
+    };
+  }
 }

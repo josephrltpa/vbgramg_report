@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, MessageSquare, CheckCircle, XCircle, Clock, MessageCircle, Send } from 'lucide-react';
+import { Plus, MessageSquare, CheckCircle, XCircle, Clock, MessageCircle, Send, Trash2 } from 'lucide-react';
 import { JCRequest, RequestType, RequestStatus } from '../types';
-import { fetchJCRequests, addJCRequest, updateJCRequest, addJobCard, fetchRequestComments, addRequestComment, RequestComment } from '../lib/services';
+import { fetchJCRequests, addJCRequest, updateJCRequest, addJobCard, fetchRequestComments, addRequestComment, deleteJCRequest, RequestComment } from '../lib/services';
 import { supabase } from '../lib/supabase';
 
 interface JCRequestModuleProps {
@@ -113,6 +113,19 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
     await loadRequests();
   }
 
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDeleteRequest(id: string) {
+    setDeleting(true);
+    const success = await deleteJCRequest(id);
+    if (success) {
+      setDeleteConfirm(null);
+      await loadRequests();
+    }
+    setDeleting(false);
+  }
+
   if (loading) return <div className="text-center py-8 text-gray-500">Loading requests...</div>;
 
   return (
@@ -209,10 +222,50 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
               userRole={userRole}
               username={username}
               onAction={handleCAAction}
+              onDelete={handleDeleteRequest}
+              isDeleting={deleting && deleteConfirm === req.id}
             />
           );
         })}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Request</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete this request and all its comments? This action cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeleteRequest(deleteConfirm)}
+                disabled={deleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {filteredRequests.length === 0 && (
         <div className="text-center py-8">
@@ -230,7 +283,21 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
 }
 
 // Compact Request Card
-function CompactRequestCard({ request: req, userRole, username, onAction }: { request: JCRequest; userRole: string; username: string; onAction: (id: string, status: RequestStatus, feedback: string) => void }) {
+function CompactRequestCard({ 
+  request: req, 
+  userRole, 
+  username, 
+  onAction,
+  onDelete,
+  isDeleting 
+}: { 
+  request: JCRequest; 
+  userRole: string; 
+  username: string; 
+  onAction: (id: string, status: RequestStatus, feedback: string) => void;
+  onDelete: (id: string) => void;
+  isDeleting: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [comments, setComments] = useState<RequestComment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -297,15 +364,38 @@ function CompactRequestCard({ request: req, userRole, username, onAction }: { re
           </div>
         </div>
 
-        {/* Expand Button */}
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-gray-400 hover:text-gray-600 p-1"
-        >
-          <svg className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
+        {/* Action Buttons */}
+        <div className="flex items-center gap-1">
+          {userRole === 'computer_assistant' && (
+            <button
+              onClick={() => {
+                if (window.confirm('Delete this request and all its comments?')) {
+                  onDelete(req.id);
+                }
+              }}
+              disabled={isDeleting}
+              className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50"
+              title="Delete request"
+            >
+              {isDeleting ? (
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                </svg>
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="text-gray-400 hover:text-gray-600 p-1"
+          >
+            <svg className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Expanded Details */}
