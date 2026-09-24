@@ -318,9 +318,18 @@ export async function updateDemandDetails(
   id: string, 
   updates: { daysWorked?: number; wageAmount?: number }
 ) {
+  // Map camelCase to snake_case for database columns
+  const dbUpdates: any = {};
+  if (updates.daysWorked !== undefined) {
+    dbUpdates.days_worked = updates.daysWorked;
+  }
+  if (updates.wageAmount !== undefined) {
+    dbUpdates.wage_amount = updates.wageAmount;
+  }
+
   const { error } = await supabase
     .from('monthly_demands')
-    .update(updates)
+    .update(dbUpdates)
     .eq('id', id);
   
   if (error) {
@@ -337,9 +346,20 @@ export async function bulkUpdateDemandDetails(
   year: number,
   updates: { daysWorked?: number; wageAmount?: number }
 ): Promise<boolean> {
+  // Map camelCase to snake_case for database columns
+  const dbUpdates: any = {};
+  if (updates.daysWorked !== undefined) {
+    dbUpdates.days_worked = updates.daysWorked;
+  }
+  if (updates.wageAmount !== undefined) {
+    dbUpdates.wage_amount = updates.wageAmount;
+  }
+
+  console.log('Bulk updating demands:', { village, month, year, dbUpdates });
+
   const { error } = await supabase
     .from('monthly_demands')
-    .update(updates)
+    .update(dbUpdates)
     .eq('village', village)
     .eq('month', month)
     .eq('year', year);
