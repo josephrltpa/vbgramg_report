@@ -151,6 +151,26 @@ export async function deleteJobCard(id: string) {
   return true;
 }
 
+export async function deleteAllJobCards(village: string): Promise<boolean> {
+  console.log('[Supabase] Deleting all job cards for village:', village);
+  
+  let query = supabase.from('job_cards').delete();
+  
+  if (village && village !== 'all') {
+    query = query.eq('village', village);
+  }
+  
+  const { error } = await query;
+  
+  if (error) {
+    console.error('[Supabase] Error deleting all job cards:', error);
+    return false;
+  }
+  
+  console.log('[Supabase] All job cards deleted successfully');
+  return true;
+}
+
 // ============================================================================
 // JC REQUESTS (VEC requests + CA feedback)
 // ============================================================================

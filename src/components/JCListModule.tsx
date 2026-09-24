@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Search, FileText, CheckCircle2, XCircle, Trash2, Upload } from 'lucide-react';
 import { JobCard, JCRequest } from '../types';
-import { fetchJobCards, addJobCard, updateJobCardStatus, deleteJobCard } from '../lib/services';
+import { fetchJobCards, addJobCard, updateJobCardStatus, deleteJobCard, deleteAllJobCards } from '../lib/services';
 import { parseExcelFile, importJobCards, ImportResult } from '../lib/excelImport';
 
 interface JCListModuleProps {
@@ -42,6 +42,7 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
     e.preventDefault();
     if (!newJC.jobCardNumber || !newJC.headName) return;
 
+    setAddingJC(true);
     const result = await addJobCard({
       jobCardNumber: newJC.jobCardNumber,
       headName: newJC.headName,
@@ -61,21 +62,39 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
       setNewJC({ jobCardNumber: '', headName: '' });
       setShowAddForm(false);
     }
+    setAddingJC(false);
   }
 
   async function handleToggleStatus(id: string, currentStatus: boolean) {
+    setTogglingStatus(id);
     const success = await updateJobCardStatus(id, !currentStatus);
     if (success) {
       setJobCards(prev => prev.map(jc => 
         jc.id === id ? { ...jc, isActive: !currentStatus } : jc
       ));
     }
+    setTogglingStatus(null);
+  }
+
+  async function handleDeleteAll() {
+    setDeletingAll(true);
+    const success = await deleteAllJobCards(village);
+    if (success) {
+      setJobCards([]);
+      setShowDeleteAllConfirm(false);
+    }
+    setDeletingAll(false);
   }
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ id: string; name: string } | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [importing, setImporting] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [addingJC, setAddingJC] = useState(false);
+  const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -113,11 +132,13 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
 
   async function confirmDelete() {
     if (!deleteConfirm) return;
+    setDeletingId(deleteConfirm.id);
     const success = await deleteJobCard(deleteConfirm.id);
     if (success) {
       setJobCards(prev => prev.filter(jc => jc.id !== deleteConfirm.id));
     }
     setDeleteConfirm(null);
+    setDeletingId(null);
   }
 
   const filtered = jobCards.filter(jc =>
@@ -157,13 +178,26 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
           🔄 Reload
         </button>
         {userRole === 'computer_assistant' && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <button
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
+              disabled={importing}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Upload className="w-4 h-4" />
-              Import Excel
+              {importing ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Import Excel
+                </>
+              )}
             </button>
             <button
               onClick={() => setShowAddForm(!showAddForm)}
@@ -172,6 +206,28 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
               <Plus className="w-4 h-4" />
               Add JC
             </button>
+            {jobCards.length > 0 && (
+              <button
+                onClick={() => setShowDeleteAllConfirm(true)}
+                disabled={deletingAll}
+                className="flex items-center gap-1.5 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingAll ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete All
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -200,10 +256,24 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
             required
           />
           <div className="flex gap-2">
-            <button type="submit" className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium min-h-[44px]">
-              Add to List
+            <button 
+              type="submit" 
+              disabled={addingJC}
+              className="flex-1 bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-medium min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {addingJC ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  Adding...
+                </>
+              ) : (
+                'Add to List'
+              )}
             </button>
-            <button type="button" onClick={() => setShowAddForm(false)} className="px-4 bg-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-medium min-h-[44px]">
+            <button type="button" onClick={() => setShowAddForm(false)} disabled={addingJC} className="px-4 bg-gray-200 text-gray-700 py-2.5 rounded-lg text-sm font-medium min-h-[44px] disabled:opacity-50">
               Cancel
             </button>
           </div>
@@ -246,18 +316,25 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
                   {userRole === 'computer_assistant' ? (
                     <button
                       onClick={() => handleToggleStatus(jc.id, jc.isActive)}
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity ${
+                      disabled={togglingStatus === jc.id}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed ${
                         jc.isActive 
                           ? 'bg-emerald-100 text-emerald-700' 
                           : 'bg-gray-100 text-gray-600'
                       }`}
                       title="Click to toggle status"
                     >
-                      {jc.isActive ? (
-                        <><CheckCircle2 className="w-3 h-3" /> Active</>
+                      {togglingStatus === jc.id ? (
+                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                        </svg>
+                      ) : jc.isActive ? (
+                        <CheckCircle2 className="w-3 h-3" />
                       ) : (
-                        <><XCircle className="w-3 h-3" /> Inactive</>
+                        <XCircle className="w-3 h-3" />
                       )}
+                      {jc.isActive ? 'Active' : 'Inactive'}
                     </button>
                   ) : (
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -277,10 +354,19 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
                   <td className="px-4 py-3">
                     <button
                       onClick={() => handleDeleteJC(jc.id)}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+                      disabled={deletingId === jc.id}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete job card"
                     >
-                      <Trash2 className="w-3 h-3" /> Delete
+                      {deletingId === jc.id ? (
+                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                        </svg>
+                      ) : (
+                        <Trash2 className="w-3 h-3" />
+                      )}
+                      {deletingId === jc.id ? 'Deleting...' : 'Delete'}
                     </button>
                   </td>
                 )}
@@ -302,17 +388,24 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
               {userRole === 'computer_assistant' ? (
                 <button
                   onClick={() => handleToggleStatus(jc.id, jc.isActive)}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer ${
+                  disabled={togglingStatus === jc.id}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
                     jc.isActive 
                       ? 'bg-emerald-100 text-emerald-700' 
                       : 'bg-gray-100 text-gray-600'
                   }`}
                 >
-                  {jc.isActive ? (
-                    <><CheckCircle2 className="w-3 h-3" /> Active</>
+                  {togglingStatus === jc.id ? (
+                    <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                  ) : jc.isActive ? (
+                    <CheckCircle2 className="w-3 h-3" />
                   ) : (
-                    <><XCircle className="w-3 h-3" /> Inactive</>
+                    <XCircle className="w-3 h-3" />
                   )}
+                  {jc.isActive ? 'Active' : 'Inactive'}
                 </button>
               ) : (
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
@@ -332,9 +425,22 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
               <div className="flex justify-end pt-2 border-t border-gray-100">
                 <button
                   onClick={() => handleDeleteJC(jc.id)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors"
+                  disabled={deletingId === jc.id}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Trash2 className="w-3 h-3" /> Delete
+                  {deletingId === jc.id ? (
+                    <>
+                      <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-3 h-3" /> Delete
+                    </>
+                  )}
                 </button>
               </div>
             )}
@@ -413,15 +519,70 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
             <div className="flex gap-2">
               <button
                 onClick={() => setDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                disabled={deletingId !== null}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                disabled={deletingId !== null}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                Delete
+                {deletingId !== null ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Confirmation Modal */}
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete All Job Cards</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete <strong>all {jobCards.length} job cards</strong> for <strong>{village}</strong>?
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-red-700">
+                ⚠️ This action cannot be undone. All job cards for this village will be permanently deleted.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteAllConfirm(false)}
+                disabled={deletingAll}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAll}
+                disabled={deletingAll}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deletingAll ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    Deleting All...
+                  </>
+                ) : (
+                  'Delete All'
+                )}
               </button>
             </div>
           </div>
