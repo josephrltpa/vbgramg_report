@@ -319,9 +319,16 @@ function CompactRequestCard({
   }
 
   async function handleAddComment() {
-    if (!newComment.trim()) return;
+    if (!newComment.trim()) {
+      console.log('Comment is empty, not submitting');
+      return;
+    }
+    
+    console.log('Adding comment:', { requestId: req.id, comment: newComment, username, userRole });
     
     const result = await addRequestComment(req.id, newComment, username, userRole);
+    console.log('Add comment result:', result);
+    
     if (result) {
       setComments(prev => [...prev, {
         id: result.id,
@@ -332,6 +339,9 @@ function CompactRequestCard({
         createdAt: result.created_at,
       }]);
       setNewComment('');
+      console.log('Comment added successfully');
+    } else {
+      console.error('Failed to add comment');
     }
   }
 
@@ -463,23 +473,34 @@ function CompactRequestCard({
             )}
 
             {/* Add Comment Input */}
-            <div className="flex gap-2">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAddComment();
+              }}
+              className="flex gap-2"
+            >
               <input
                 type="text"
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAddComment();
+                  }
+                }}
                 placeholder="Add a comment..."
                 className="flex-1 border border-gray-200 rounded px-2 py-1.5 text-sm outline-none focus:border-indigo-400"
               />
               <button
-                onClick={handleAddComment}
+                type="submit"
                 disabled={!newComment.trim()}
                 className="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
               >
                 <Send className="w-3 h-3" />
               </button>
-            </div>
+            </form>
           </div>
         </div>
       )}

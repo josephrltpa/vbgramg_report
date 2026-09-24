@@ -314,6 +314,23 @@ export async function updateDemandCreditStatus(id: string, status: CreditStatus,
   if (error) console.error('Error updating demand:', error);
 }
 
+export async function updateDemandDetails(
+  id: string, 
+  updates: { daysWorked?: number; wageAmount?: number }
+) {
+  const { error } = await supabase
+    .from('monthly_demands')
+    .update(updates)
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Error updating demand details:', error);
+    return false;
+  }
+  
+  return true;
+}
+
 export async function updateDemandWagelistLink(id: string, link: string) {
   const { error } = await supabase.from('monthly_demands').update({
     wagelist_link: link,
