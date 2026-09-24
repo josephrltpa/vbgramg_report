@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, FileText, Check, X, Upload, Download, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { JobCard, MonthlyDemand, MONTHS, CreditStatus } from '../types';
-import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, deleteVillageWagelist, VillageWagelist } from '../lib/services';
+import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, updateDemandDetails, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, deleteVillageWagelist, VillageWagelist } from '../lib/services';
 import { uploadWagelistFile, deleteWagelistFile, viewHtmlFile, downloadFile } from '../lib/storage';
 import { parseExcelFile, importMonthlyDemands, ImportResult } from '../lib/excelImport';
 
@@ -80,6 +80,16 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     await updateDemandCreditStatus(demand.id, newStatus, creditDate);
     await loadData();
     setTogglingCredit(null);
+  }
+
+  async function handleUpdateDemandDetails(
+    id: string, 
+    updates: { daysWorked?: number; wageAmount?: number }
+  ) {
+    const success = await updateDemandDetails(id, updates);
+    if (success) {
+      await loadData();
+    }
   }
 
   async function handleDelete(id: string) {
@@ -214,6 +224,13 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Check if village is selected for admin
+    if (userRole === 'computer_assistant' && !village) {
+      alert('Please select a village first before importing demands.');
+      e.target.value = '';
+      return;
+    }
+
     setImporting(true);
     setImportResult(null);
 
@@ -303,7 +320,13 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
               )}
             </button>
             <button
-              onClick={() => setShowAddPanel(!showAddPanel)}
+              onClick={() => {
+                if (userRole === 'computer_assistant' && !village) {
+                  alert('Please select a village first before adding members.');
+                  return;
+                }
+                setShowAddPanel(!showAddPanel);
+              }}
               className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
             >
               <Plus className="w-4 h-4" />
@@ -634,6 +657,7 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                 index={startIndex + idx + 1}
                 userRole={userRole}
                 onToggleCredit={handleToggleCredit}
+                onUpdateDetails={handleUpdateDemandDetails}
                 onDelete={setDeleteConfirm}
                 isToggling={togglingCredit === demand.id}
                 isDeleting={deletingId === demand.id}
@@ -652,6 +676,7 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
             index={startIndex + idx + 1}
             userRole={userRole}
             onToggleCredit={handleToggleCredit}
+            onUpdateDetails={handleUpdateDemandDetails}
             onDelete={setDeleteConfirm}
             isToggling={togglingCredit === demand.id}
             isDeleting={deletingId === demand.id}
@@ -893,6 +918,7 @@ function DemandRow({
   index,
   userRole,
   onToggleCredit,
+  onUpdateDetails,
   onDelete,
   isToggling,
   isDeleting,
@@ -901,12 +927,32 @@ function DemandRow({
   index: number;
   userRole: string;
   onToggleCredit: (d: MonthlyDemand) => void;
+  onUpdateDetails: (id: string, updates: { daysWorked?: number; wageAmount?: number }) => void;
   onDelete: (id: string) => void;
   isToggling: boolean;
   isDeleting: boolean;
 }) {
+  const [editingDays, setEditingDays] = useState(false);
+  const [editingAmount, setEditingAmount] = useState(false);
+  const [daysValue, setDaysValue] = useState(demand.daysWorked);
+  const [amountValue, setAmountValue] = useState(demand.wageAmount);
+
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
+  };
+
+  const handleDaysBlur = () => {
+    setEditingDays(false);
+    if (daysValue !== demand.daysWorked) {
+      onUpdateDetails(demand.id, { daysWorked: daysValue });
+    }
+  };
+
+  const handleAmountBlur = () => {
+    setEditingAmount(false);
+    if (amountValue !== demand.wageAmount) {
+      onUpdateDetails(demand.id, { wageAmount: amountValue });
+    }
   };
 
   return (
@@ -914,8 +960,60 @@ function DemandRow({
       <td className="px-4 py-3 text-gray-400 text-xs">{index}</td>
       <td className="px-4 py-3 font-mono text-xs text-gray-700">{demand.jobCardNumber}</td>
       <td className="px-4 py-3 font-medium text-gray-900">{demand.headName}</td>
-      <td className="px-4 py-3 text-gray-700">{demand.daysWorked}</td>
-      <td className="px-4 py-3 font-semibold text-gray-800">{formatAmount(demand.wageAmount)}</td>
+      <td className="px-4 py-3 text-gray-700">
+        {userRole === 'computer_assistant' && editingDays ? (
+          <input
+            type="number"
+            value={daysValue}
+            onChange={(e) => setDaysValue(Number(e.target.value))}
+            onBlur={handleDaysBlur}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleDaysBlur();
+              if (e.key === 'Escape') {
+                setDaysValue(demand.daysWorked);
+                setEditingDays(false);
+              }
+            }}
+            autoFocus
+            className="w-16 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        ) : (
+          <span
+            onClick={() => userRole === 'computer_assistant' && setEditingDays(true)}
+            className={userRole === 'computer_assistant' ? 'cursor-pointer hover:bg-indigo-50 px-2 py-1 rounded' : ''}
+            title={userRole === 'computer_assistant' ? 'Click to edit' : ''}
+          >
+            {demand.daysWorked}
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3 font-semibold text-gray-800">
+        {userRole === 'computer_assistant' && editingAmount ? (
+          <input
+            type="number"
+            value={amountValue}
+            onChange={(e) => setAmountValue(Number(e.target.value))}
+            onBlur={handleAmountBlur}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleAmountBlur();
+              if (e.key === 'Escape') {
+                setAmountValue(demand.wageAmount);
+                setEditingAmount(false);
+              }
+            }}
+            autoFocus
+            className="w-24 px-2 py-1 text-sm border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        ) : (
+          <span
+            onClick={() => userRole === 'computer_assistant' && setEditingAmount(true)}
+            className={userRole === 'computer_assistant' ? 'cursor-pointer hover:bg-indigo-50 px-2 py-1 rounded' : ''}
+            title={userRole === 'computer_assistant' ? 'Click to edit' : ''}
+          >
+            {formatAmount(demand.wageAmount)}
+          </span>
+        )}
+      </td>
       <td className="px-4 py-3">
         {userRole === 'computer_assistant' ? (
           <button
@@ -980,6 +1078,7 @@ function DemandCard({
   index,
   userRole,
   onToggleCredit,
+  onUpdateDetails,
   onDelete,
   isToggling,
   isDeleting,
@@ -988,22 +1087,66 @@ function DemandCard({
   index: number;
   userRole: string;
   onToggleCredit: (d: MonthlyDemand) => void;
+  onUpdateDetails: (id: string, updates: { daysWorked?: number; wageAmount?: number }) => void;
   onDelete: (id: string) => void;
   isToggling: boolean;
   isDeleting: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [editingDays, setEditingDays] = useState(false);
+  const [editingAmount, setEditingAmount] = useState(false);
+  const [daysValue, setDaysValue] = useState(demand.daysWorked);
+  const [amountValue, setAmountValue] = useState(demand.wageAmount);
   
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
   };
+
+  const handleDaysBlur = () => {
+    setEditingDays(false);
+    if (daysValue !== demand.daysWorked) {
+      onUpdateDetails(demand.id, { daysWorked: daysValue });
+    }
+  };
+
+  const handleAmountBlur = () => {
+    setEditingAmount(false);
+    if (amountValue !== demand.wageAmount) {
+      onUpdateDetails(demand.id, { wageAmount: amountValue });
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-4">
       <div className="flex items-start justify-between mb-2">
-        <div>
+        <div className="flex-1">
           <p className="text-xs text-gray-400 font-mono">#{index} • {demand.jobCardNumber}</p>
           <h4 className="text-sm font-semibold text-gray-900 mt-1">{demand.headName}</h4>
-          <p className="text-sm font-bold text-gray-800 mt-1">{formatAmount(demand.wageAmount)}</p>
+          {userRole === 'computer_assistant' && editingAmount ? (
+            <input
+              type="number"
+              value={amountValue}
+              onChange={(e) => setAmountValue(Number(e.target.value))}
+              onBlur={handleAmountBlur}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAmountBlur();
+                if (e.key === 'Escape') {
+                  setAmountValue(demand.wageAmount);
+                  setEditingAmount(false);
+                }
+              }}
+              autoFocus
+              className="mt-1 w-full px-2 py-1 text-sm font-bold border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          ) : (
+            <p 
+              className={`text-sm font-bold text-gray-800 mt-1 ${userRole === 'computer_assistant' ? 'cursor-pointer hover:bg-indigo-50 px-2 py-1 rounded -mx-2' : ''}`}
+              onClick={() => userRole === 'computer_assistant' && setEditingAmount(true)}
+              title={userRole === 'computer_assistant' ? 'Click to edit' : ''}
+            >
+              {formatAmount(demand.wageAmount)}
+            </p>
+          )}
         </div>
         {userRole === 'computer_assistant' ? (
           <button
@@ -1051,9 +1194,33 @@ function DemandCard({
 
       {expanded && (
         <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
-          <div className="flex justify-between text-xs">
+          <div className="flex justify-between text-xs items-center">
             <span className="text-gray-500">Days Worked:</span>
-            <span className="font-medium text-gray-700">{demand.daysWorked}</span>
+            {userRole === 'computer_assistant' && editingDays ? (
+              <input
+                type="number"
+                value={daysValue}
+                onChange={(e) => setDaysValue(Number(e.target.value))}
+                onBlur={handleDaysBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleDaysBlur();
+                  if (e.key === 'Escape') {
+                    setDaysValue(demand.daysWorked);
+                    setEditingDays(false);
+                  }
+                }}
+                autoFocus
+                className="w-20 px-2 py-1 text-sm font-medium text-right border border-indigo-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            ) : (
+              <span 
+                className={`font-medium text-gray-700 ${userRole === 'computer_assistant' ? 'cursor-pointer hover:bg-indigo-50 px-2 py-1 rounded' : ''}`}
+                onClick={() => userRole === 'computer_assistant' && setEditingDays(true)}
+                title={userRole === 'computer_assistant' ? 'Click to edit' : ''}
+              >
+                {demand.daysWorked}
+              </span>
+            )}
           </div>
 
           {userRole === 'computer_assistant' && (
