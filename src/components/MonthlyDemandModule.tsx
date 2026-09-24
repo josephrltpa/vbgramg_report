@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, FileText, Check, X, Upload, Download, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { JobCard, MonthlyDemand, MONTHS, CreditStatus } from '../types';
-import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, updateDemandDetails, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, deleteVillageWagelist, VillageWagelist } from '../lib/services';
+import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, updateDemandDetails, bulkUpdateDemandDetails, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, deleteVillageWagelist, VillageWagelist } from '../lib/services';
 import { uploadWagelistFile, deleteWagelistFile, viewHtmlFile, downloadFile } from '../lib/storage';
 import { parseExcelFile, importMonthlyDemands, ImportResult } from '../lib/excelImport';
 
@@ -34,6 +34,9 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   const [uploadingWagelist, setUploadingWagelist] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [bulkDays, setBulkDays] = useState<string>('');
+  const [bulkAmount, setBulkAmount] = useState<string>('');
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -89,6 +92,34 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     const success = await updateDemandDetails(id, updates);
     if (success) {
       await loadData();
+    }
+  }
+
+  async function handleBulkUpdateDetails() {
+    if (!bulkDays && !bulkAmount) {
+      alert('Please enter at least one value (days or amount) to update.');
+      return;
+    }
+
+    const updates: { daysWorked?: number; wageAmount?: number } = {};
+    if (bulkDays) updates.daysWorked = Number(bulkDays);
+    if (bulkAmount) updates.wageAmount = Number(bulkAmount);
+
+    setBulkUpdating(true);
+    const success = await bulkUpdateDemandDetails(
+      village,
+      selectedMonth,
+      selectedYear,
+      updates
+    );
+    setBulkUpdating(false);
+
+    if (success) {
+      await loadData();
+      setBulkDays('');
+      setBulkAmount('');
+    } else {
+      alert('Failed to update demands. Please try again.');
     }
   }
 
@@ -515,79 +546,131 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
       </div>
 
       {/* Bulk Actions for Admin */}
-      {userRole === 'computer_assistant' && (pendingCount > 0 || creditedCount > 0) && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              <p className="text-sm font-medium text-gray-900">Bulk Actions</p>
-              <p className="text-xs text-gray-600">
-                {pendingCount > 0 && <span className="text-amber-600">{pendingCount} pending</span>}
-                {pendingCount > 0 && creditedCount > 0 && <span> • </span>}
-                {creditedCount > 0 && <span className="text-emerald-600">{creditedCount} credited</span>}
-              </p>
+      {userRole === 'computer_assistant' && demands.length > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-4">
+          {/* Credit Status Actions */}
+          {(pendingCount > 0 || creditedCount > 0) && (
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">Credit Status</p>
+                <p className="text-xs text-gray-600">
+                  {pendingCount > 0 && <span className="text-amber-600">{pendingCount} pending</span>}
+                  {pendingCount > 0 && creditedCount > 0 && <span> • </span>}
+                  {creditedCount > 0 && <span className="text-emerald-600">{creditedCount} credited</span>}
+                </p>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {pendingCount > 0 && (
+                  <button
+                    onClick={handleMarkAllCredited}
+                    disabled={markingAllCredited}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {markingAllCredited ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                        </svg>
+                        Marking...
+                      </>
+                    ) : (
+                      'Mark All as Credited'
+                    )}
+                  </button>
+                )}
+                {creditedCount > 0 && (
+                  <button
+                    onClick={handleMarkAllPending}
+                    disabled={markingAllPending}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {markingAllPending ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                        </svg>
+                        Marking...
+                      </>
+                    ) : (
+                      'Mark All as Pending'
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {pendingCount > 0 && (
-                <button
-                  onClick={handleMarkAllCredited}
-                  disabled={markingAllCredited}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {markingAllCredited ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                      </svg>
-                      Marking...
-                    </>
-                  ) : (
-                    'Mark All as Credited'
-                  )}
-                </button>
-              )}
-              {creditedCount > 0 && (
-                <button
-                  onClick={handleMarkAllPending}
-                  disabled={markingAllPending}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {markingAllPending ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                      </svg>
-                      Marking...
-                    </>
-                  ) : (
-                    'Mark All as Pending'
-                  )}
-                </button>
-              )}
-              {demands.length > 0 && (
-                <button
-                  onClick={() => setShowDeleteAllConfirm(true)}
-                  disabled={deletingAll}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {deletingAll ? (
-                    <>
-                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                      </svg>
-                      Deleting...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="w-4 h-4" />
-                      Delete All
-                    </>
-                  )}
-                </button>
-              )}
+          )}
+
+          {/* Days & Amount Bulk Update */}
+          <div className="border-t border-gray-200 pt-4">
+            <p className="text-sm font-medium text-gray-900 mb-3">Update Days & Amount for All</p>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[120px]">
+                <label className="text-xs text-gray-600 mb-1 block">Days Worked</label>
+                <input
+                  type="number"
+                  value={bulkDays}
+                  onChange={(e) => setBulkDays(e.target.value)}
+                  placeholder="e.g., 15"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="flex-1 min-w-[120px]">
+                <label className="text-xs text-gray-600 mb-1 block">Wage Amount (₹)</label>
+                <input
+                  type="number"
+                  value={bulkAmount}
+                  onChange={(e) => setBulkAmount(e.target.value)}
+                  placeholder="e.g., 4500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <button
+                onClick={handleBulkUpdateDetails}
+                disabled={bulkUpdating || (!bulkDays && !bulkAmount)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {bulkUpdating ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                    </svg>
+                    Updating...
+                  </>
+                ) : (
+                  'Apply to All'
+                )}
+              </button>
             </div>
+            <p className="text-xs text-gray-500 mt-2">
+              Leave fields empty to skip. This will update all {demands.length} demands for {MONTHS.find(m => m.index === selectedMonth)?.fullLabel} {selectedYear}.
+            </p>
+          </div>
+
+          {/* Delete All */}
+          <div className="border-t border-gray-200 pt-4 flex justify-end">
+            <button
+              onClick={() => setShowDeleteAllConfirm(true)}
+              disabled={deletingAll}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {deletingAll ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  Delete All Demands
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}

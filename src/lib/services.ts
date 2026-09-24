@@ -331,6 +331,27 @@ export async function updateDemandDetails(
   return true;
 }
 
+export async function bulkUpdateDemandDetails(
+  village: string,
+  month: number,
+  year: number,
+  updates: { daysWorked?: number; wageAmount?: number }
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('monthly_demands')
+    .update(updates)
+    .eq('village', village)
+    .eq('month', month)
+    .eq('year', year);
+  
+  if (error) {
+    console.error('Error bulk updating demand details:', error);
+    return false;
+  }
+  
+  return true;
+}
+
 export async function updateDemandWagelistLink(id: string, link: string) {
   const { error } = await supabase.from('monthly_demands').update({
     wagelist_link: link,
