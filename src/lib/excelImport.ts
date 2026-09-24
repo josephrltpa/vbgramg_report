@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 export interface ImportResult {
   success: number;
   failed: number;
+  skipped: number;
   errors: string[];
 }
 
@@ -35,33 +36,48 @@ export function parseExcelFile(file: File): Promise<any[]> {
   });
 }
 
-// Import Job Cards from Excel
+// Import Job Cards from Excel with smart filtering
 export async function importJobCards(data: any[], village: string): Promise<ImportResult> {
-  const result: ImportResult = { success: 0, failed: 0, errors: [] };
+  const result: ImportResult = { success: 0, failed: 0, skipped: 0, errors: [] };
   
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     const rowNum = i + 2; // Excel row number (1-indexed, +1 for header)
     
     // Map Excel columns to database fields
-    // Expected columns: "Job Card Number" or "JC Number", "Head Name" or "Name"
-    const jobCardNumber = row['Job Card Number'] || row['JC Number'] || row['job_card_number'];
+    // Expected columns: "Job Card Number" or "JC Number", "Head Name" or "Name", "Status"
+    const jobCardNumberRaw = row['Job Card Number'] || row['JC Number'] || row['job_card_number'];
     const headName = row['Head Name'] || row['Name'] || row['head_name'];
+    const status = row['Status'] || row['status'] || '';
     
-    if (!jobCardNumber || !headName) {
+    if (!jobCardNumberRaw || !headName) {
       result.failed++;
       result.errors.push(`Row ${rowNum}: Missing required fields (Job Card Number or Head Name)`);
       continue;
     }
     
+    const jobCardNumber = jobCardNumberRaw.toString().trim();
+    
+    // Smart filtering logic:
+    // 1. Skip JCs with * at the end
+    if (jobCardNumber.endsWith('*')) {
+      result.skipped++;
+      continue;
+    }
+    
+    // 2. Determine active status based on Status column
+    // If status is "ACTIVE" (case-insensitive) → active
+    // If status is empty or anything else → inactive
+    const isActive = status.toString().trim().toUpperCase() === 'ACTIVE';
+    
     try {
       const { error } = await supabase
         .from('job_cards')
         .insert({
-          job_card_number: jobCardNumber.toString().trim(),
+          job_card_number: jobCardNumber,
           head_name: headName.toString().trim(),
           village: village,
-          is_active: true,
+          is_active: isActive,
         });
       
       if (error) {
@@ -86,7 +102,7 @@ export async function importMonthlyDemands(
   month: number, 
   year: number
 ): Promise<ImportResult> {
-  const result: ImportResult = { success: 0, failed: 0, errors: [] };
+  const result: ImportResult = { success: 0, failed: 0, skipped: 0, errors: [] };
   
   for (let i = 0; i < data.length; i++) {
     const row = data[i];

@@ -277,6 +277,7 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
       setImportResult({
         success: 0,
         failed: 0,
+        skipped: 0,
         errors: [`Failed to parse Excel file: ${error.message}`],
       });
     } finally {
@@ -938,6 +939,9 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                   <p className="text-sm font-medium mb-2">Import Results:</p>
                   <div className="text-xs space-y-1">
                     <p className="text-green-700">✓ Successfully imported: {importResult.success}</p>
+                    {importResult.skipped > 0 && (
+                      <p className="text-blue-700">⊘ Skipped: {importResult.skipped}</p>
+                    )}
                     {importResult.failed > 0 && (
                       <p className="text-red-700">✗ Failed: {importResult.failed}</p>
                     )}
