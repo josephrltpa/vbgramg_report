@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { ClipboardList, MessageSquare, CalendarDays, LogOut, Menu, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ClipboardList, MessageSquare, CalendarDays, LogOut, Menu, X, Bell } from 'lucide-react';
 import Login from './components/Login';
 import JCListModule from './components/JCListModule';
 import JCRequestModule from './components/JCRequestModule';
 import MonthlyDemandModule from './components/MonthlyDemandModule';
 import LocationSelector from './components/LocationSelector';
+import { fetchJCRequests } from './lib/services';
 
 type Tab = 'jclist' | 'requests' | 'demands';
 
@@ -38,6 +39,26 @@ function App() {
   const [selectedVillage, setSelectedVillage] = useState<string>(() => {
     return localStorage.getItem('mgnrega_selected_village') || '';
   });
+  
+  // Notification state for admin
+  const [pendingRequestsCount, setPendingRequestsCount] = useState<number>(0);
+  
+  // Fetch pending requests count for admin
+  useEffect(() => {
+    if (userRole === 'computer_assistant') {
+      const fetchPendingCount = async () => {
+        const requests = await fetchJCRequests();
+        const pendingCount = requests.filter(r => r.status === 'Submitted').length;
+        setPendingRequestsCount(pendingCount);
+      };
+      
+      fetchPendingCount();
+      
+      // Refresh every 30 seconds
+      const interval = setInterval(fetchPendingCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [userRole, activeTab]);
   
   const handleTabChange = (tab: Tab) => {
     setActiveTab(tab);
@@ -129,9 +150,23 @@ function App() {
               </div>
             </div>
             
-            {/* Location Selector for Admin */}
+            {/* Location Selector and Notifications for Admin */}
             {userRole === 'computer_assistant' && (
               <div className="flex items-center gap-2">
+                {/* Notification Bell */}
+                <button
+                  onClick={() => handleTabChange('requests')}
+                  className="relative p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  title={`${pendingRequestsCount} pending request${pendingRequestsCount !== 1 ? 's' : ''}`}
+                >
+                  <Bell className="w-5 h-5 text-gray-600" />
+                  {pendingRequestsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+                      {pendingRequestsCount > 9 ? '9+' : pendingRequestsCount}
+                    </span>
+                  )}
+                </button>
+                
                 <LocationSelector
                   selectedDistrict={selectedDistrictId}
                   selectedBlock={selectedBlockId}
@@ -147,11 +182,12 @@ function App() {
             <nav className="hidden md:flex items-center gap-1">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
+                const showBadge = tab.id === 'requests' && userRole === 'computer_assistant' && pendingRequestsCount > 0;
                 return (
                   <button
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    className={`relative flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                       activeTab === tab.id
                         ? 'bg-indigo-50 text-indigo-700'
                         : 'text-gray-600 hover:bg-gray-50'
@@ -159,6 +195,11 @@ function App() {
                   >
                     <Icon className="w-4 h-4" />
                     {tab.label}
+                    {showBadge && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                        {pendingRequestsCount > 9 ? '9+' : pendingRequestsCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -199,6 +240,7 @@ function App() {
               
               {tabs.map((tab) => {
                 const Icon = tab.icon;
+                const showBadge = tab.id === 'requests' && userRole === 'computer_assistant' && pendingRequestsCount > 0;
                 return (
                   <button
                     key={tab.id}
@@ -211,6 +253,11 @@ function App() {
                   >
                     <Icon className="w-5 h-5" />
                     {tab.label}
+                    {showBadge && (
+                      <span className="ml-auto bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5">
+                        {pendingRequestsCount} pending
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -244,6 +291,7 @@ function App() {
         <div className="flex items-center justify-around py-2 px-4">
           {tabs.map((tab) => {
             const Icon = tab.icon;
+            const showBadge = tab.id === 'requests' && userRole === 'computer_assistant' && pendingRequestsCount > 0;
             return (
               <button
                 key={tab.id}
@@ -252,7 +300,14 @@ function App() {
                   activeTab === tab.id ? 'text-indigo-600' : 'text-gray-400'
                 }`}
               >
-                <Icon className={`w-5 h-5 ${activeTab === tab.id ? 'stroke-[2.5px]' : ''}`} />
+                <div className="relative">
+                  <Icon className={`w-5 h-5 ${activeTab === tab.id ? 'stroke-[2.5px]' : ''}`} />
+                  {showBadge && (
+                    <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                      {pendingRequestsCount > 9 ? '9+' : pendingRequestsCount}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] font-semibold">{tab.label}</span>
                 {activeTab === tab.id && (
                   <div className="absolute bottom-0 w-8 h-0.5 bg-indigo-600 rounded-full" />
