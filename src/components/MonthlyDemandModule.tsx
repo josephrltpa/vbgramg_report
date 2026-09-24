@@ -24,6 +24,11 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(200);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [markingAllCredited, setMarkingAllCredited] = useState(false);
+  const [markingAllPending, setMarkingAllPending] = useState(false);
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [togglingCredit, setTogglingCredit] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -62,10 +67,12 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   }
 
   async function handleToggleCredit(demand: MonthlyDemand) {
+    setTogglingCredit(demand.id);
     const newStatus: CreditStatus = demand.creditStatus === 'Credited' ? 'Pending' : 'Credited';
     const creditDate = newStatus === 'Credited' ? new Date().toISOString().split('T')[0] : '';
     await updateDemandCreditStatus(demand.id, newStatus, creditDate);
     await loadData();
+    setTogglingCredit(null);
   }
 
   async function handleUpdateWagelist(id: string, link: string) {
@@ -74,12 +81,15 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   }
 
   async function handleDelete(id: string) {
+    setDeletingId(id);
     await deleteMonthlyDemand(id);
     setDeleteConfirm(null);
     await loadData();
+    setDeletingId(null);
   }
 
   async function handleMarkAllCredited() {
+    setMarkingAllCredited(true);
     const pendingDemands = demands.filter(d => d.creditStatus === 'Pending');
     const creditDate = new Date().toISOString().split('T')[0];
     
@@ -89,9 +99,11 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     }
     
     await loadData();
+    setMarkingAllCredited(false);
   }
 
   async function handleMarkAllPending() {
+    setMarkingAllPending(true);
     const creditedDemands = demands.filter(d => d.creditStatus === 'Credited');
     
     // Update all credited demands back to pending
@@ -100,15 +112,18 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     }
     
     await loadData();
+    setMarkingAllPending(false);
   }
 
   async function handleDeleteAll() {
+    setDeletingAll(true);
     // Delete all demands for current village/month/year
     for (const demand of demands) {
       await deleteMonthlyDemand(demand.id);
     }
     setShowDeleteAllConfirm(false);
     await loadData();
+    setDeletingAll(false);
   }
 
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
@@ -183,10 +198,23 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
           <div className="flex gap-2">
             <button
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
+              disabled={importing}
+              className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Upload className="w-4 h-4" />
-              Import Excel
+              {importing ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Import Excel
+                </>
+              )}
             </button>
             <button
               onClick={() => setShowAddPanel(!showAddPanel)}
@@ -251,26 +279,61 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
               {pendingCount > 0 && (
                 <button
                   onClick={handleMarkAllCredited}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+                  disabled={markingAllCredited}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Mark All as Credited
+                  {markingAllCredited ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                      </svg>
+                      Marking...
+                    </>
+                  ) : (
+                    'Mark All as Credited'
+                  )}
                 </button>
               )}
               {creditedCount > 0 && (
                 <button
                   onClick={handleMarkAllPending}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors"
+                  disabled={markingAllPending}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Mark All as Pending
+                  {markingAllPending ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                      </svg>
+                      Marking...
+                    </>
+                  ) : (
+                    'Mark All as Pending'
+                  )}
                 </button>
               )}
               {demands.length > 0 && (
                 <button
                   onClick={() => setShowDeleteAllConfirm(true)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors flex items-center gap-1.5"
+                  disabled={deletingAll}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Trash2 className="w-4 h-4" />
-                  Delete All
+                  {deletingAll ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete All
+                    </>
+                  )}
                 </button>
               )}
             </div>
@@ -346,6 +409,8 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
                 onToggleCredit={handleToggleCredit}
                 onUpdateWagelist={handleUpdateWagelist}
                 onDelete={setDeleteConfirm}
+                isToggling={togglingCredit === demand.id}
+                isDeleting={deletingId === demand.id}
               />
             ))}
           </tbody>
@@ -363,6 +428,8 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
             onToggleCredit={handleToggleCredit}
             onUpdateWagelist={handleUpdateWagelist}
             onDelete={setDeleteConfirm}
+            isToggling={togglingCredit === demand.id}
+            isDeleting={deletingId === demand.id}
           />
         ))}
       </div>
@@ -603,6 +670,8 @@ function DemandRow({
   onToggleCredit,
   onUpdateWagelist,
   onDelete,
+  isToggling,
+  isDeleting,
 }: {
   demand: MonthlyDemand;
   index: number;
@@ -610,6 +679,8 @@ function DemandRow({
   onToggleCredit: (d: MonthlyDemand) => void;
   onUpdateWagelist: (id: string, link: string) => void;
   onDelete: (id: string) => void;
+  isToggling: boolean;
+  isDeleting: boolean;
 }) {
   const [editingLink, setEditingLink] = useState(false);
   const [linkInput, setLinkInput] = useState(demand.wagelistLink);
@@ -629,14 +700,24 @@ function DemandRow({
         {userRole === 'computer_assistant' ? (
           <button
             onClick={() => onToggleCredit(demand)}
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold min-h-[32px] ${
+            disabled={isToggling}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold min-h-[32px] disabled:opacity-50 disabled:cursor-not-allowed ${
               demand.creditStatus === 'Credited'
                 ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                 : 'bg-amber-100 text-amber-700 border border-amber-200'
             }`}
           >
-            {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-            {demand.creditStatus}
+            {isToggling ? (
+              <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+              </svg>
+            ) : demand.creditStatus === 'Credited' ? (
+              <Check className="w-3 h-3" />
+            ) : (
+              <X className="w-3 h-3" />
+            )}
+            {isToggling ? 'Updating...' : demand.creditStatus}
           </button>
         ) : (
           <span
@@ -691,9 +772,17 @@ function DemandRow({
         <td className="px-4 py-3">
           <button
             onClick={() => onDelete(demand.id)}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+            disabled={isDeleting}
+            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Trash2 className="w-3 h-3" />
+            {isDeleting ? (
+              <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+              </svg>
+            ) : (
+              <Trash2 className="w-3 h-3" />
+            )}
           </button>
         </td>
       )}
@@ -709,6 +798,8 @@ function DemandCard({
   onToggleCredit,
   onUpdateWagelist,
   onDelete,
+  isToggling,
+  isDeleting,
 }: {
   demand: MonthlyDemand;
   index: number;
@@ -716,6 +807,8 @@ function DemandCard({
   onToggleCredit: (d: MonthlyDemand) => void;
   onUpdateWagelist: (id: string, link: string) => void;
   onDelete: (id: string) => void;
+  isToggling: boolean;
+  isDeleting: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editingLink, setEditingLink] = useState(false);
@@ -736,14 +829,24 @@ function DemandCard({
         {userRole === 'computer_assistant' ? (
           <button
             onClick={() => onToggleCredit(demand)}
-            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold ${
+            disabled={isToggling}
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold disabled:opacity-50 disabled:cursor-not-allowed ${
               demand.creditStatus === 'Credited'
                 ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                 : 'bg-amber-100 text-amber-700 border border-amber-200'
             }`}
           >
-            {demand.creditStatus === 'Credited' ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-            {demand.creditStatus}
+            {isToggling ? (
+              <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+              </svg>
+            ) : demand.creditStatus === 'Credited' ? (
+              <Check className="w-3 h-3" />
+            ) : (
+              <X className="w-3 h-3" />
+            )}
+            {isToggling ? 'Updating...' : demand.creditStatus}
           </button>
         ) : (
           <span
@@ -820,10 +923,23 @@ function DemandCard({
           {userRole === 'computer_assistant' && (
             <button
               onClick={() => onDelete(demand.id)}
-              className="w-full flex items-center justify-center gap-1.5 text-xs text-red-600 font-medium bg-red-50 rounded-lg py-2 mt-2"
+              disabled={isDeleting}
+              className="w-full flex items-center justify-center gap-1.5 text-xs text-red-600 font-medium bg-red-50 rounded-lg py-2 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Trash2 className="w-3 h-3" />
-              Remove from list
+              {isDeleting ? (
+                <>
+                  <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-3 h-3" />
+                  Remove from list
+                </>
+              )}
             </button>
           )}
         </div>
