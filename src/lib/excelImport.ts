@@ -95,6 +95,78 @@ export async function importJobCards(data: any[], village: string): Promise<Impo
   return result;
 }
 
+// Import FTO Reports from Excel
+export async function importFTOReports(
+  data: any[], 
+  village: string,
+  sourceFile: string
+): Promise<ImportResult> {
+  const result: ImportResult = { success: 0, failed: 0, skipped: 0, errors: [] };
+  
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    const rowNum = i + 2; // Excel row number
+    
+    // Map Excel columns to database fields
+    // Flexible column name mapping for government portal exports
+    const jobCardNo = row['Job Card No'] || row['Job Card Number'] || row['JC Number'] || row['job_card_no'] || row['job_card_number'];
+    const applicantName = row['Applicant Name'] || row['Name'] || row['applicant_name'] || row['head_name'];
+    const amountToBeCredited = row['Amount to be credited'] || row['Amount'] || row['amount_to_be_credited'] || row['amount'] || 0;
+    const status = row['Status'] || row['status'] || '';
+    const processedDate = row['Processed Date'] || row['processed_date'] || row['Date'] || '';
+    const bankName = row['Paid in account of (in case of ABP)'] || row['Bank Name'] || row['bank_name'] || row['Paid in account of'] || '';
+    
+    if (!jobCardNo || !applicantName) {
+      result.failed++;
+      result.errors.push(`Row ${rowNum}: Missing required fields (Job Card No or Applicant Name)`);
+      continue;
+    }
+    
+    try {
+      // Parse date if it exists
+      let parsedDate = '';
+      if (processedDate) {
+        if (typeof processedDate === 'string') {
+          parsedDate = processedDate;
+        } else if (processedDate instanceof Date) {
+          parsedDate = processedDate.toISOString().split('T')[0];
+        } else {
+          // Try to parse as date
+          const dateObj = new Date(processedDate);
+          if (!isNaN(dateObj.getTime())) {
+            parsedDate = dateObj.toISOString().split('T')[0];
+          }
+        }
+      }
+      
+      const { error } = await supabase
+        .from('fto_reports')
+        .insert({
+          job_card_no: jobCardNo.toString().trim(),
+          applicant_name: applicantName.toString().trim(),
+          amount_to_be_credited: Number(amountToBeCredited) || 0,
+          status: status.toString().trim(),
+          processed_date: parsedDate || null,
+          bank_name: bankName.toString().trim(),
+          village: village,
+          source_file: sourceFile,
+        });
+      
+      if (error) {
+        result.failed++;
+        result.errors.push(`Row ${rowNum}: ${error.message}`);
+      } else {
+        result.success++;
+      }
+    } catch (error: any) {
+      result.failed++;
+      result.errors.push(`Row ${rowNum}: ${error.message}`);
+    }
+  }
+  
+  return result;
+}
+
 // Import Monthly Demands from Excel
 export async function importMonthlyDemands(
   data: any[], 

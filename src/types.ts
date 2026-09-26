@@ -69,6 +69,19 @@ export interface MonthlyDemand {
   createdAt: string;
 }
 
+export interface FTOReport {
+  id: string;
+  jobCardNo: string;
+  applicantName: string;
+  amountToBeCredited: number;
+  status: string;
+  processedDate: string;
+  bankName: string;
+  village: string;
+  importedAt: string;
+  sourceFile: string;
+}
+
 export interface District {
   id: string;
   name: string;
