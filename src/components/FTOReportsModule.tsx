@@ -169,17 +169,30 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
         <div className="flex-1">
           <label className="text-xs font-medium text-gray-600 mb-1 block">Month</label>
           <div className="flex overflow-x-auto whitespace-nowrap gap-1.5 pb-1 scrollbar-hide snap-x">
-            {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((monthName, idx) => (
+            {[
+              { name: 'Apr', value: 4 },
+              { name: 'May', value: 5 },
+              { name: 'Jun', value: 6 },
+              { name: 'Jul', value: 7 },
+              { name: 'Aug', value: 8 },
+              { name: 'Sep', value: 9 },
+              { name: 'Oct', value: 10 },
+              { name: 'Nov', value: 11 },
+              { name: 'Dec', value: 12 },
+              { name: 'Jan', value: 1 },
+              { name: 'Feb', value: 2 },
+              { name: 'Mar', value: 3 }
+            ].map((month) => (
               <button
-                key={idx}
-                onClick={() => setSelectedMonth(idx + 1)}
+                key={month.value}
+                onClick={() => setSelectedMonth(month.value)}
                 className={`shrink-0 px-3 py-2 rounded-full text-xs font-semibold min-h-[40px] min-w-[50px] snap-start transition-all ${
-                  selectedMonth === idx + 1
+                  selectedMonth === month.value
                     ? 'bg-indigo-600 text-white shadow-md'
                     : 'bg-white text-gray-600 border border-gray-200'
                 }`}
               >
-                {monthName}
+                {month.name}
               </button>
             ))}
           </div>
@@ -317,7 +330,7 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
                   <li>• <strong>Paid in account of (in case of ABP)</strong> → will be shown as "Bank Name"</li>
                 </ul>
                 <p className="text-xs text-blue-600 mt-2">
-                  All reports will be added to: <strong>{village}</strong> for <strong>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth - 1]} {selectedYear}</strong>
+                  All reports will be added to: <strong>{village}</strong> for <strong>{['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'][(selectedMonth + 8) % 12]} {selectedYear}</strong>
                 </p>
               </div>
 
@@ -392,7 +405,7 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete All FTO Reports</h3>
             <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to delete <strong>all {reports.length} FTO reports</strong> for <strong>{village}</strong> for <strong>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth - 1]} {selectedYear}</strong>?
+              Are you sure you want to delete <strong>all {reports.length} FTO reports</strong> for <strong>{village}</strong> for <strong>{['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'][(selectedMonth + 8) % 12]} {selectedYear}</strong>?
             </p>
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
               <p className="text-xs text-red-700">

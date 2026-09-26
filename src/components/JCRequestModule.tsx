@@ -34,6 +34,10 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
     headName: '',
     requestType: 'Add New JC' as RequestType,
     remarks: '',
+    aadhaarNumber: '',
+    bankName: '',
+    accountNumber: '',
+    dateOfBirth: '',
   });
 
   useEffect(() => {
@@ -61,21 +65,60 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!newReq.jobCardNumber || !newReq.headName) return;
+    
+    // Validation based on request type
+    if (!newReq.headName) {
+      alert('Worker Name is required');
+      return;
+    }
+    
+    // For Delete JC and Correction, job card number is required
+    if ((newReq.requestType === 'Delete JC' || newReq.requestType === 'Correction') && !newReq.jobCardNumber) {
+      alert('Job Card Number is required for Delete and Correction requests');
+      return;
+    }
+    
+    // For Add New JC and Correction, additional details are required
+    if ((newReq.requestType === 'Add New JC' || newReq.requestType === 'Correction') && 
+        (!newReq.aadhaarNumber || !newReq.bankName || !newReq.accountNumber || !newReq.dateOfBirth)) {
+      alert('Aadhaar Number, Bank Name, Account Number, and Date of Birth are required for Add New JC and Correction requests');
+      return;
+    }
+
+    // Build remarks with additional details
+    let fullRemarks = newReq.remarks;
+    if (newReq.requestType === 'Add New JC' || newReq.requestType === 'Correction') {
+      const details = [
+        newReq.aadhaarNumber && `Aadhaar: ${newReq.aadhaarNumber}`,
+        newReq.bankName && `Bank: ${newReq.bankName}`,
+        newReq.accountNumber && `A/C: ${newReq.accountNumber}`,
+        newReq.dateOfBirth && `DOB: ${newReq.dateOfBirth}`,
+      ].filter(Boolean).join(' | ');
+      fullRemarks = fullRemarks ? `${fullRemarks}\n${details}` : details;
+    }
 
     const result = await addJCRequest({
-      jobCardNumber: newReq.jobCardNumber,
+      jobCardNumber: newReq.jobCardNumber || 'PENDING', // Use placeholder if not provided
       headName: newReq.headName,
       village,
       requestType: newReq.requestType,
-      remarks: newReq.remarks,
+      remarks: fullRemarks,
       requestDate: new Date().toISOString().split('T')[0],
       requestedBy: username,
     });
 
     if (result) {
       await loadRequests();
-      setNewReq({ jobCardNumber: '', headName: '', requestType: 'Add New JC', remarks: '' });
+      setNewReq({ 
+        jobCardNumber: '', 
+        headName: '', 
+        requestType: 'Add New JC', 
+        remarks: '',
+        aadhaarNumber: '',
+        bankName: '',
+        accountNumber: '',
+        dateOfBirth: '',
+      });
       setShowForm(false);
     }
   }
@@ -152,22 +195,6 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
       {/* VEC Request Form */}
       {showForm && userRole === 'secretary' && (
         <form onSubmit={handleSubmit} className="bg-indigo-50 rounded-xl p-4 space-y-3 border border-indigo-100">
-          <input
-            type="text"
-            value={newReq.jobCardNumber}
-            onChange={(e) => setNewReq({ ...newReq, jobCardNumber: e.target.value })}
-            placeholder="Job Card Number"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
-            required
-          />
-          <input
-            type="text"
-            value={newReq.headName}
-            onChange={(e) => setNewReq({ ...newReq, headName: e.target.value })}
-            placeholder="Worker Name"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
-            required
-          />
           <select
             value={newReq.requestType}
             onChange={(e) => setNewReq({ ...newReq, requestType: e.target.value as RequestType })}
@@ -177,10 +204,83 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
             <option value="Delete JC">Delete JC</option>
             <option value="Correction">Correction</option>
           </select>
+          
+          <input
+            type="text"
+            value={newReq.headName}
+            onChange={(e) => setNewReq({ ...newReq, headName: e.target.value })}
+            placeholder="Worker Name *"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+            required
+          />
+          
+          {/* Job Card Number - required for Delete and Correction, optional for Add New */}
+          {(newReq.requestType === 'Delete JC' || newReq.requestType === 'Correction') && (
+            <input
+              type="text"
+              value={newReq.jobCardNumber}
+              onChange={(e) => setNewReq({ ...newReq, jobCardNumber: e.target.value })}
+              placeholder="Job Card Number *"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+              required
+            />
+          )}
+          
+          {newReq.requestType === 'Add New JC' && (
+            <input
+              type="text"
+              value={newReq.jobCardNumber}
+              onChange={(e) => setNewReq({ ...newReq, jobCardNumber: e.target.value })}
+              placeholder="Job Card Number (optional - will be assigned by admin)"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+            />
+          )}
+          
+          {/* Additional details for Add New JC and Correction */}
+          {(newReq.requestType === 'Add New JC' || newReq.requestType === 'Correction') && (
+            <>
+              <div className="bg-white rounded-lg p-3 space-y-3 border border-indigo-200">
+                <p className="text-xs font-medium text-indigo-700">Personal & Bank Details *</p>
+                <input
+                  type="text"
+                  value={newReq.aadhaarNumber}
+                  onChange={(e) => setNewReq({ ...newReq, aadhaarNumber: e.target.value })}
+                  placeholder="Aadhaar Number *"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+                  required
+                />
+                <input
+                  type="date"
+                  value={newReq.dateOfBirth}
+                  onChange={(e) => setNewReq({ ...newReq, dateOfBirth: e.target.value })}
+                  placeholder="Date of Birth *"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+                  required
+                />
+                <input
+                  type="text"
+                  value={newReq.bankName}
+                  onChange={(e) => setNewReq({ ...newReq, bankName: e.target.value })}
+                  placeholder="Bank Name *"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+                  required
+                />
+                <input
+                  type="text"
+                  value={newReq.accountNumber}
+                  onChange={(e) => setNewReq({ ...newReq, accountNumber: e.target.value })}
+                  placeholder="Account Number *"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+                  required
+                />
+              </div>
+            </>
+          )}
+          
           <textarea
             value={newReq.remarks}
             onChange={(e) => setNewReq({ ...newReq, remarks: e.target.value })}
-            placeholder="Remarks / Details (e.g. reason, Aadhar number, etc.)"
+            placeholder="Remarks / Additional Details"
             className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[80px]"
           />
           <div className="flex gap-2">
