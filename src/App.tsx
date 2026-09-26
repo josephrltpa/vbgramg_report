@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { ClipboardList, MessageSquare, CalendarDays, LogOut, Menu, X, Bell } from 'lucide-react';
+import { ClipboardList, MessageSquare, CalendarDays, LogOut, Menu, X, Bell, FileText } from 'lucide-react';
 import Login from './components/Login';
 import JCListModule from './components/JCListModule';
 import JCRequestModule from './components/JCRequestModule';
 import MonthlyDemandModule from './components/MonthlyDemandModule';
+import FTOReportsModule from './components/FTOReportsModule';
 import LocationSelector from './components/LocationSelector';
 import { fetchJCRequests } from './lib/services';
 
-type Tab = 'jclist' | 'requests' | 'demands';
+type Tab = 'jclist' | 'requests' | 'demands' | 'fto';
 
 function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(() => {
@@ -142,6 +143,7 @@ function App() {
     { id: 'jclist', label: 'JC List', icon: ClipboardList },
     { id: 'requests', label: 'Requests', icon: MessageSquare },
     { id: 'demands', label: 'Demands', icon: CalendarDays },
+    { id: 'fto', label: 'FTO Reports', icon: FileText },
   ];
 
   return (
@@ -411,6 +413,9 @@ function App() {
         )}
         {activeTab === 'demands' && (
           <MonthlyDemandModule village={village} userRole={userRole} />
+        )}
+        {activeTab === 'fto' && (
+          <FTOReportsModule village={village} userRole={userRole} />
         )}
       </main>
 

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { JobCard, JCRequest, MonthlyDemand, RequestStatus, CreditStatus, District, Block, Village } from '../types';
+import { JobCard, JCRequest, MonthlyDemand, RequestStatus, CreditStatus, District, Block, Village, FTOReport } from '../types';
 
 // ============================================================================
 // LOCATIONS (Districts, Blocks, Villages)
@@ -574,4 +574,93 @@ export async function uploadVillageWagelist(
       createdAt: data.created_at,
     };
   }
+}
+
+// ============================================================================
+// FTO REPORTS
+// ============================================================================
+export async function fetchFTOReports(village?: string): Promise<FTOReport[]> {
+  let query = supabase
+    .from('fto_reports')
+    .select('*')
+    .order('imported_at', { ascending: false });
+  
+  if (village && village !== 'all') {
+    query = query.eq('village', village);
+  }
+  
+  const { data, error } = await query;
+  
+  if (error) {
+    console.error('Error fetching FTO reports:', error);
+    return [];
+  }
+  
+  return (data || []).map((row: any) => ({
+    id: row.id,
+    jobCardNo: row.job_card_no,
+    applicantName: row.applicant_name,
+    amountToBeCredited: row.amount_to_be_credited,
+    status: row.status || '',
+    processedDate: row.processed_date || '',
+    bankName: row.bank_name || '',
+    village: row.village,
+    importedAt: row.imported_at,
+    sourceFile: row.source_file || '',
+  }));
+}
+
+export async function addFTOReport(report: Omit<FTOReport, 'id' | 'importedAt'>) {
+  const { data, error } = await supabase
+    .from('fto_reports')
+    .insert({
+      job_card_no: report.jobCardNo,
+      applicant_name: report.applicantName,
+      amount_to_be_credited: report.amountToBeCredited,
+      status: report.status,
+      processed_date: report.processedDate || null,
+      bank_name: report.bankName,
+      village: report.village,
+      source_file: report.sourceFile,
+    })
+    .select()
+    .single();
+  
+  if (error) {
+    console.error('Error adding FTO report:', error);
+    return null;
+  }
+  
+  return data;
+}
+
+export async function deleteFTOReport(id: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('fto_reports')
+    .delete()
+    .eq('id', id);
+  
+  if (error) {
+    console.error('Error deleting FTO report:', error);
+    return false;
+  }
+  
+  return true;
+}
+
+export async function deleteAllFTOReports(village: string): Promise<boolean> {
+  let query = supabase.from('fto_reports').delete();
+  
+  if (village && village !== 'all') {
+    query = query.eq('village', village);
+  }
+  
+  const { error } = await query;
+  
+  if (error) {
+    console.error('Error deleting all FTO reports:', error);
+    return false;
+  }
+  
+  return true;
 }
