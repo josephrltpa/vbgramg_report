@@ -583,7 +583,7 @@ export async function fetchFTOReports(village?: string, month?: number, year?: n
   let query = supabase
     .from('fto_reports')
     .select('*')
-    .order('imported_at', { ascending: false });
+    .order('job_card_no', { ascending: true });
   
   if (village && village !== 'all') {
     query = query.eq('village', village);
