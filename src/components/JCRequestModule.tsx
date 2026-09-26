@@ -10,6 +10,13 @@ interface JCRequestModuleProps {
   userRole: string;
 }
 
+// Helper function to format date from YYYY-MM-DD to DD-MM-YYYY
+function formatDate(dateString: string): string {
+  if (!dateString) return '';
+  const [year, month, day] = dateString.split('-');
+  return `${day}-${month}-${year}`;
+}
+
 const statusColors: Record<RequestStatus, string> = {
   'Submitted': 'bg-amber-100 text-amber-700 border-amber-200',
   'In Progress': 'bg-blue-100 text-blue-700 border-blue-200',
@@ -165,6 +172,10 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
 
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  function handleDeleteClick(id: string) {
+    setDeleteConfirm(id);
+  }
 
   async function handleDeleteRequest(id: string) {
     setDeleting(true);
@@ -340,7 +351,7 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
               userRole={userRole}
               username={username}
               onAction={handleCAAction}
-              onDelete={handleDeleteRequest}
+              onDelete={handleDeleteClick}
               isDeleting={deleting && deleteConfirm === req.id}
             />
           );
@@ -488,21 +499,17 @@ function CompactRequestCard({
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span className="font-mono">{req.jobCardNumber}</span>
             <span>•</span>
-            <span>{req.requestDate}</span>
+            <span>{formatDate(req.requestDate)}</span>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-3">
           {userRole === 'computer_assistant' && (
             <button
-              onClick={() => {
-                if (window.confirm('Delete this request and all its comments?')) {
-                  onDelete(req.id);
-                }
-              }}
+              onClick={() => onDelete(req.id)}
               disabled={isDeleting}
-              className="text-red-500 hover:text-red-700 p-1 disabled:opacity-50"
+              className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
               title="Delete request"
             >
               {isDeleting ? (
@@ -517,7 +524,7 @@ function CompactRequestCard({
           )}
           <button
             onClick={() => setExpanded(!expanded)}
-            className="text-gray-400 hover:text-gray-600 p-1"
+            className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
           >
             <svg className={`w-4 h-4 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -541,7 +548,7 @@ function CompactRequestCard({
                 <MessageSquare className="w-3 h-3 inline" /> {req.processedBy}:
               </p>
               <p className="text-sm text-emerald-800 mt-1">{req.feedback}</p>
-              {req.actionDate && <p className="text-xs text-emerald-500 mt-1">{req.actionDate}</p>}
+              {req.actionDate && <p className="text-xs text-emerald-500 mt-1">{formatDate(req.actionDate)}</p>}
             </div>
           )}
 
@@ -580,7 +587,7 @@ function CompactRequestCard({
                           {comment.commentRole === 'computer_assistant' ? 'CA' : 'VEC'}
                         </span>
                         <span className="text-xs text-gray-400">
-                          {new Date(comment.createdAt).toLocaleDateString()}
+                          {formatDate(comment.createdAt.split('T')[0])}
                         </span>
                       </div>
                       <p className="text-sm text-gray-700">{comment.commentText}</p>
