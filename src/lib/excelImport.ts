@@ -111,12 +111,12 @@ export async function importFTOReports(
     
     // Map Excel columns to database fields
     // Flexible column name mapping for government portal exports
-    const jobCardNo = row['Job Card No'] || row['Job Card Number'] || row['JC Number'] || row['job_card_no'] || row['job_card_number'];
+    const jobCardNo = row['Job Card No.'] || row['Job Card No'] || row['Job Card Number'] || row['JC Number'] || row['job_card_no'] || row['job_card_number'];
     const applicantName = row['Applicant Name'] || row['Name'] || row['applicant_name'] || row['head_name'];
-    const amountToBeCredited = row['Amount to be credited'] || row['Amount'] || row['amount_to_be_credited'] || row['amount'] || 0;
+    const amountToBeCredited = row['Amount to be credited (In Rs.)'] || row['Amount to be credited'] || row['Amount'] || row['amount_to_be_credited'] || row['amount'] || 0;
     const status = row['Status'] || row['status'] || '';
     const processedDate = row['Processed Date'] || row['processed_date'] || row['Date'] || '';
-    const bankName = row['Paid in account of (in case of ABP)'] || row['Bank Name'] || row['bank_name'] || row['Paid in account of'] || '';
+    const bankName = row['Paid in account of'] || row['Paid in account of (in case of ABP)'] || row['Bank Name'] || row['bank_name'] || '';
     
     if (!jobCardNo || !applicantName) {
       result.failed++;
