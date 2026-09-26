@@ -76,12 +76,14 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
     setDeletingAll(false);
   }
 
-  const filtered = reports.filter(r =>
-    r.jobCardNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.applicantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.status.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    r.bankName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = reports
+    .filter(r =>
+      r.jobCardNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.applicantName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.status.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      r.bankName.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => a.jobCardNo.localeCompare(b.jobCardNo));
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
