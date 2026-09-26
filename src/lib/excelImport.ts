@@ -16,14 +16,17 @@ export function parseExcelFile(file: File): Promise<any[]> {
     reader.onload = (e) => {
       try {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
         
         // Get first sheet
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         
-        // Convert to JSON
-        const jsonData = XLSX.utils.sheet_to_json(sheet);
+        // Convert to JSON with date handling
+        const jsonData = XLSX.utils.sheet_to_json(sheet, { 
+          raw: false, 
+          dateNF: 'yyyy-mm-dd' 
+        });
         
         resolve(jsonData);
       } catch (error) {
@@ -178,16 +181,40 @@ export async function importFTOReports(
     }
     
     try {
-      // Parse date if it exists
+      // Parse date if it exists - handle DD/MM/YYYY format from Excel
       let parsedDate = '';
       if (processedDate) {
         if (typeof processedDate === 'string') {
-          parsedDate = processedDate;
+          // Try DD/MM/YYYY format first (common in Indian Excel)
+          const ddmmyyyy = processedDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+          if (ddmmyyyy) {
+            const [, day, month, year] = ddmmyyyy;
+            parsedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          } else {
+            // Try MM/DD/YYYY format
+            const mmddyyyy = processedDate.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+            if (mmddyyyy) {
+              const [, month, day, year] = mmddyyyy;
+              parsedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            } else {
+              // Try YYYY-MM-DD format (already correct)
+              const yyyymmdd = processedDate.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+              if (yyyymmdd) {
+                parsedDate = processedDate;
+              } else {
+                // Try to parse as date object
+                const dateObj = new Date(processedDate);
+                if (!isNaN(dateObj.getTime())) {
+                  parsedDate = dateObj.toISOString().split('T')[0];
+                }
+              }
+            }
+          }
         } else if (processedDate instanceof Date) {
           parsedDate = processedDate.toISOString().split('T')[0];
-        } else {
-          // Try to parse as date
-          const dateObj = new Date(processedDate);
+        } else if (typeof processedDate === 'number') {
+          // Excel stores dates as numbers (days since 1900)
+          const dateObj = new Date((processedDate - 25569) * 86400 * 1000);
           if (!isNaN(dateObj.getTime())) {
             parsedDate = dateObj.toISOString().split('T')[0];
           }
