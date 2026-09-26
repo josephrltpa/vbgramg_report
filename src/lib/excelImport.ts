@@ -99,6 +99,8 @@ export async function importJobCards(data: any[], village: string): Promise<Impo
 export async function importFTOReports(
   data: any[], 
   village: string,
+  month: number,
+  year: number,
   sourceFile: string
 ): Promise<ImportResult> {
   const result: ImportResult = { success: 0, failed: 0, skipped: 0, errors: [] };
@@ -149,6 +151,8 @@ export async function importFTOReports(
           processed_date: parsedDate || null,
           bank_name: bankName.toString().trim(),
           village: village,
+          month: month,
+          year: year,
           source_file: sourceFile,
         });
       

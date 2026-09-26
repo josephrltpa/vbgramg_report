@@ -78,6 +78,8 @@ export interface FTOReport {
   processedDate: string;
   bankName: string;
   village: string;
+  month: number;
+  year: number;
   importedAt: string;
   sourceFile: string;
 }
