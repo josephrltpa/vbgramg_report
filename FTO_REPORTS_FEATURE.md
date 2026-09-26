@@ -8,13 +8,21 @@ The FTO Reports tab allows you to import FTO (Fund Transfer Order) reports from 
 
 ## ✨ Features
 
-### 1. **Excel Import**
+### 1. **Month/Year Selection**
+- Select month and year to view specific FTO reports
+- Horizontal scrollable month selector (like Demands tab)
+- Year dropdown (2024, 2025, 2026)
+- Automatically filters reports by selected period
+- Defaults to current month/year
+
+### 2. **Excel Import**
 - Upload FTO reports directly from the government portal
 - Supports `.xlsx` and `.xls` files
 - Automatic column mapping (flexible column name detection)
 - Shows import results with success/failure counts
+- Imports are tied to selected month/year
 
-### 2. **Filtered Display**
+### 3. **Filtered Display**
 Shows only the columns you need:
 - **Job Card No** - The job card number
 - **Applicant Name** - Name of the applicant
@@ -23,19 +31,19 @@ Shows only the columns you need:
 - **Processed Date** - Date when processed (formatted)
 - **Bank Name** - Bank name (renamed from "Paid in account of (in case of ABP)")
 
-### 3. **Search & Filter**
+### 4. **Search & Filter**
 - Search by job card number, applicant name, status, or bank name
 - Real-time filtering as you type
 - Works on both desktop and mobile
 
-### 4. **Responsive Design**
+### 5. **Responsive Design**
 - **Desktop**: Full table view with all columns
 - **Mobile**: Card view with essential information
 - Touch-friendly interface
 
-### 5. **Data Management**
+### 6. **Data Management**
 - Delete individual reports (future enhancement)
-- Delete all reports for a village
+- Delete all reports for a village and month/year
 - Import history tracking
 
 ---
@@ -55,27 +63,33 @@ Shows only the columns you need:
 1. Login to the VBGRAMG Webapp
 2. **Select a village** from the location selector (admin only)
 3. Click on the **"FTO Reports"** tab
-4. Click the **"Import Report"** button (green button)
-5. Select the Excel file you downloaded
-6. Wait for the import to complete
-7. View the import results:
+4. **Select the month and year** for the FTO report:
+   - Click on the month pill (Jan, Feb, Mar, etc.)
+   - Select the year from the dropdown
+5. Click the **"Import Report"** button (green button)
+6. Select the Excel file you downloaded
+7. Wait for the import to complete
+8. View the import results:
    - ✓ Successfully imported: X records
    - ✗ Failed: Y records (with error details)
 
 ### Step 3: View and Search
 
 1. The imported data appears in a table (desktop) or cards (mobile)
-2. Use the **search bar** to find specific records:
+2. Data is filtered by the selected month/year
+3. Use the **search bar** to find specific records:
    - Search by job card number
    - Search by applicant name
    - Search by status
    - Search by bank name
-3. Results update in real-time as you type
+4. Results update in real-time as you type
+5. Change month/year to view different periods
 
 ### Step 4: Manage Reports
 
-- **Delete All**: Click the red "Delete All" button to remove all FTO reports for the selected village
-- **Import More**: You can import multiple Excel files - they will be appended to existing data
+- **Delete All**: Click the red "Delete All" button to remove all FTO reports for the selected village and month/year
+- **Import More**: You can import multiple Excel files for the same month/year - they will be appended to existing data
+- **Switch Periods**: Change month/year to view or import reports for different periods
 
 ---
 
@@ -120,6 +134,8 @@ CREATE TABLE fto_reports (
   processed_date DATE,
   bank_name TEXT,
   village TEXT NOT NULL,
+  month INTEGER NOT NULL,
+  year INTEGER NOT NULL,
   imported_at TIMESTAMP,
   source_file TEXT
 );
@@ -195,9 +211,11 @@ Display in FTO Reports tab
 ### For Admin Users
 
 1. **Select Village First**: Always select a village before importing
-2. **Regular Imports**: Import FTO reports regularly to keep data current
-3. **Delete Old Reports**: Periodically delete old reports to keep the database clean
-4. **Use Filters**: Export filtered data from government portal to import only what you need
+2. **Select Month/Year**: Choose the correct month/year before importing
+3. **Regular Imports**: Import FTO reports regularly to keep data current
+4. **Delete Old Reports**: Periodically delete old reports to keep the database clean
+5. **Use Filters**: Export filtered data from government portal to import only what you need
+6. **Organize by Period**: Keep each month's reports separate for better organization
 
 ### For Village Users
 
@@ -259,20 +277,24 @@ Potential features for future versions:
 
 - **Admin Only**: Only admin (computer_assistant) can import and delete FTO reports
 - **Village-Specific**: FTO reports are tied to specific villages
-- **Append Mode**: Importing adds to existing data (doesn't replace)
+- **Month/Year-Specific**: FTO reports are organized by month and year (financial year)
+- **Append Mode**: Importing adds to existing data for the same village/month/year (doesn't replace)
 - **No Validation**: The system doesn't validate if job card numbers exist in the JC List
 - **Date Parsing**: The system tries to parse dates in various formats, but may not handle all formats correctly
+- **Default Period**: Defaults to current month/year when you first open the tab
 
 ---
 
 ## 🎯 Summary
 
-The FTO Reports feature provides a clean, searchable view of FTO data imported from the government portal. It filters out unnecessary columns and presents only the essential information in a user-friendly format, making it easy to track payment status and bank details for job card holders.
+The FTO Reports feature provides a clean, searchable view of FTO data imported from the government portal, organized by month and year. It filters out unnecessary columns and presents only the essential information in a user-friendly format, making it easy to track payment status and bank details for job card holders across different periods.
 
 **Key Benefits:**
 - ✅ Clean, focused view of FTO data
+- ✅ Month/year selection for period-based organization
 - ✅ Easy import from government portal
 - ✅ Powerful search functionality
 - ✅ Mobile-friendly design
 - ✅ Color-coded status indicators
 - ✅ Village-specific data management
+- ✅ Period-specific data isolation

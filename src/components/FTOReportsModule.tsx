@@ -18,14 +18,16 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
 
   useEffect(() => {
     loadReports();
-  }, [village]);
+  }, [village, selectedMonth, selectedYear]);
 
   async function loadReports() {
     setLoading(true);
-    const data = await fetchFTOReports(village);
+    const data = await fetchFTOReports(village, selectedMonth, selectedYear);
     setReports(data);
     setLoading(false);
   }
@@ -45,7 +47,7 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
 
     try {
       const data = await parseExcelFile(file);
-      const result = await importFTOReports(data, village, file.name);
+      const result = await importFTOReports(data, village, selectedMonth, selectedYear, file.name);
       setImportResult(result);
       
       if (result.success > 0) {
@@ -66,7 +68,7 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
 
   async function handleDeleteAll() {
     setDeletingAll(true);
-    const success = await deleteAllFTOReports(village);
+    const success = await deleteAllFTOReports(village, selectedMonth, selectedYear);
     if (success) {
       setReports([]);
       setShowDeleteAllConfirm(false);
@@ -158,6 +160,40 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
             )}
           </div>
         )}
+      </div>
+
+      {/* Month/Year Selector */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1">
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Month</label>
+          <div className="flex overflow-x-auto whitespace-nowrap gap-1.5 pb-1 scrollbar-hide snap-x">
+            {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((monthName, idx) => (
+              <button
+                key={idx}
+                onClick={() => setSelectedMonth(idx + 1)}
+                className={`shrink-0 px-3 py-2 rounded-full text-xs font-semibold min-h-[40px] min-w-[50px] snap-start transition-all ${
+                  selectedMonth === idx + 1
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'bg-white text-gray-600 border border-gray-200'
+                }`}
+              >
+                {monthName}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="w-full sm:w-32">
+          <label className="text-xs font-medium text-gray-600 mb-1 block">Year</label>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none min-h-[44px] bg-white"
+          >
+            <option value={2024}>2024</option>
+            <option value={2025}>2025</option>
+            <option value={2026}>2026</option>
+          </select>
+        </div>
       </div>
 
       {/* Search */}
@@ -279,7 +315,7 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
                   <li>• <strong>Paid in account of (in case of ABP)</strong> → will be shown as "Bank Name"</li>
                 </ul>
                 <p className="text-xs text-blue-600 mt-2">
-                  All reports will be added to: <strong>{village}</strong>
+                  All reports will be added to: <strong>{village}</strong> for <strong>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth - 1]} {selectedYear}</strong>
                 </p>
               </div>
 
@@ -354,11 +390,11 @@ export default function FTOReportsModule({ village, userRole }: FTOReportsModule
           <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete All FTO Reports</h3>
             <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to delete <strong>all {reports.length} FTO reports</strong> for <strong>{village}</strong>?
+              Are you sure you want to delete <strong>all {reports.length} FTO reports</strong> for <strong>{village}</strong> for <strong>{['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth - 1]} {selectedYear}</strong>?
             </p>
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
               <p className="text-xs text-red-700">
-                ⚠️ This action cannot be undone. All FTO reports for this village will be permanently deleted.
+                ⚠️ This action cannot be undone. All FTO reports for this village and month will be permanently deleted.
               </p>
             </div>
             <div className="flex gap-2">

@@ -579,7 +579,7 @@ export async function uploadVillageWagelist(
 // ============================================================================
 // FTO REPORTS
 // ============================================================================
-export async function fetchFTOReports(village?: string): Promise<FTOReport[]> {
+export async function fetchFTOReports(village?: string, month?: number, year?: number): Promise<FTOReport[]> {
   let query = supabase
     .from('fto_reports')
     .select('*')
@@ -587,6 +587,14 @@ export async function fetchFTOReports(village?: string): Promise<FTOReport[]> {
   
   if (village && village !== 'all') {
     query = query.eq('village', village);
+  }
+  
+  if (month) {
+    query = query.eq('month', month);
+  }
+  
+  if (year) {
+    query = query.eq('year', year);
   }
   
   const { data, error } = await query;
@@ -605,6 +613,8 @@ export async function fetchFTOReports(village?: string): Promise<FTOReport[]> {
     processedDate: row.processed_date || '',
     bankName: row.bank_name || '',
     village: row.village,
+    month: row.month,
+    year: row.year,
     importedAt: row.imported_at,
     sourceFile: row.source_file || '',
   }));
@@ -621,6 +631,8 @@ export async function addFTOReport(report: Omit<FTOReport, 'id' | 'importedAt'>)
       processed_date: report.processedDate || null,
       bank_name: report.bankName,
       village: report.village,
+      month: report.month,
+      year: report.year,
       source_file: report.sourceFile,
     })
     .select()
@@ -648,11 +660,19 @@ export async function deleteFTOReport(id: string): Promise<boolean> {
   return true;
 }
 
-export async function deleteAllFTOReports(village: string): Promise<boolean> {
+export async function deleteAllFTOReports(village: string, month?: number, year?: number): Promise<boolean> {
   let query = supabase.from('fto_reports').delete();
   
   if (village && village !== 'all') {
     query = query.eq('village', village);
+  }
+  
+  if (month) {
+    query = query.eq('month', month);
+  }
+  
+  if (year) {
+    query = query.eq('year', year);
   }
   
   const { error } = await query;

@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS fto_reports (
   processed_date DATE,
   bank_name TEXT,
   village TEXT NOT NULL,
+  month INTEGER NOT NULL CHECK (month BETWEEN 1 AND 12),
+  year INTEGER NOT NULL,
   imported_at TIMESTAMPTZ DEFAULT NOW(),
   source_file TEXT
 );
@@ -16,6 +18,7 @@ CREATE TABLE IF NOT EXISTS fto_reports (
 CREATE INDEX IF NOT EXISTS idx_fto_reports_village ON fto_reports(village);
 CREATE INDEX IF NOT EXISTS idx_fto_reports_job_card_no ON fto_reports(job_card_no);
 CREATE INDEX IF NOT EXISTS idx_fto_reports_status ON fto_reports(status);
+CREATE INDEX IF NOT EXISTS idx_fto_reports_month_year ON fto_reports(month, year);
 CREATE INDEX IF NOT EXISTS idx_fto_reports_imported_at ON fto_reports(imported_at DESC);
 
 -- Disable RLS for now
