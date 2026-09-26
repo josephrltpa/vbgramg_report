@@ -241,38 +241,49 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
             <>
               <div className="bg-white rounded-lg p-3 space-y-3 border border-indigo-200">
                 <p className="text-xs font-medium text-indigo-700">Personal & Bank Details *</p>
-                <input
-                  type="text"
-                  value={newReq.aadhaarNumber}
-                  onChange={(e) => setNewReq({ ...newReq, aadhaarNumber: e.target.value })}
-                  placeholder="Aadhaar Number *"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
-                  required
-                />
-                <input
-                  type="date"
-                  value={newReq.dateOfBirth}
-                  onChange={(e) => setNewReq({ ...newReq, dateOfBirth: e.target.value })}
-                  placeholder="Date of Birth *"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
-                  required
-                />
-                <input
-                  type="text"
-                  value={newReq.bankName}
-                  onChange={(e) => setNewReq({ ...newReq, bankName: e.target.value })}
-                  placeholder="Bank Name *"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
-                  required
-                />
-                <input
-                  type="text"
-                  value={newReq.accountNumber}
-                  onChange={(e) => setNewReq({ ...newReq, accountNumber: e.target.value })}
-                  placeholder="Account Number *"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
-                  required
-                />
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Aadhaar Number *</label>
+                  <input
+                    type="text"
+                    value={newReq.aadhaarNumber}
+                    onChange={(e) => setNewReq({ ...newReq, aadhaarNumber: e.target.value })}
+                    placeholder="Enter 12-digit Aadhaar number"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Date of Birth *</label>
+                  <input
+                    type="date"
+                    value={newReq.dateOfBirth}
+                    onChange={(e) => setNewReq({ ...newReq, dateOfBirth: e.target.value })}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Bank Name *</label>
+                  <input
+                    type="text"
+                    value={newReq.bankName}
+                    onChange={(e) => setNewReq({ ...newReq, bankName: e.target.value })}
+                    placeholder="Enter bank name"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-700 mb-1 block">Account Number *</label>
+                  <input
+                    type="text"
+                    value={newReq.accountNumber}
+                    onChange={(e) => setNewReq({ ...newReq, accountNumber: e.target.value })}
+                    placeholder="Enter bank account number"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none min-h-[44px]"
+                    required
+                  />
+                </div>
               </div>
             </>
           )}
