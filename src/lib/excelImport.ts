@@ -95,6 +95,39 @@ export async function importJobCards(data: any[], village: string): Promise<Impo
   return result;
 }
 
+// Helper function to extract Job Card number from cell that may contain panchayat name
+function extractJobCardNo(raw: any): string {
+  if (!raw) return '';
+  const str = raw.toString().trim();
+  
+  // Handle cases like: "MZ-01-003-020-001/10\n(buhban)" or "MZ-01-003-020-001/10 (buhban)"
+  // Split on newline, parenthesis, or multiple spaces
+  const parts = str.split(/[\n\r]+|\s*\(|\s{2,}/);
+  return parts[0].trim();
+}
+
+// Helper to find column value by trying multiple possible header names
+function findColumnValue(row: any, possibleNames: string[]): any {
+  // First try exact matches
+  for (const name of possibleNames) {
+    if (row[name] !== undefined && row[name] !== null && row[name] !== '') {
+      return row[name];
+    }
+  }
+  
+  // Then try partial matches (case-insensitive)
+  const rowKeys = Object.keys(row);
+  for (const name of possibleNames) {
+    const lowerName = name.toLowerCase();
+    const found = rowKeys.find(key => key.toLowerCase().includes(lowerName));
+    if (found && row[found] !== undefined && row[found] !== null && row[found] !== '') {
+      return row[found];
+    }
+  }
+  
+  return null;
+}
+
 // Import FTO Reports from Excel
 export async function importFTOReports(
   data: any[], 
@@ -105,18 +138,38 @@ export async function importFTOReports(
 ): Promise<ImportResult> {
   const result: ImportResult = { success: 0, failed: 0, skipped: 0, errors: [] };
   
+  // Debug: log first row to see actual column names
+  if (data.length > 0) {
+    console.log('[FTO Import] Column names found:', Object.keys(data[0]));
+    console.log('[FTO Import] First row sample:', data[0]);
+  }
+  
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     const rowNum = i + 2; // Excel row number
     
-    // Map Excel columns to database fields
-    // Flexible column name mapping for government portal exports
-    const jobCardNo = row['Job Card No'] || row['Job Card Number'] || row['JC Number'] || row['job_card_no'] || row['job_card_number'];
-    const applicantName = row['Applicant Name'] || row['Name'] || row['applicant_name'] || row['head_name'];
-    const amountToBeCredited = row['Amount to be credited'] || row['Amount'] || row['amount_to_be_credited'] || row['amount'] || 0;
-    const status = row['Status'] || row['status'] || '';
-    const processedDate = row['Processed Date'] || row['processed_date'] || row['Date'] || '';
-    const bankName = row['Paid in account of (in case of ABP)'] || row['Bank Name'] || row['bank_name'] || row['Paid in account of'] || '';
+    // Map Excel columns to database fields with flexible matching
+    const rawJobCardNo = findColumnValue(row, [
+      'Job Card No.', 'Job Card No', 'Job Card Number', 'JC Number', 
+      'job_card_no', 'job_card_number', 'Job Card'
+    ]);
+    const applicantName = findColumnValue(row, [
+      'Applicant Name', 'Name', 'applicant_name', 'head_name'
+    ]);
+    const amountToBeCredited = findColumnValue(row, [
+      'Amount to be credited (In Rs.)', 'Amount to be credited', 
+      'Amount', 'amount_to_be_credited', 'amount'
+    ]) || 0;
+    const status = findColumnValue(row, ['Status', 'status']) || '';
+    const processedDate = findColumnValue(row, [
+      'Processed Date', 'processed_date', 'Date'
+    ]) || '';
+    const bankName = findColumnValue(row, [
+      'Paid in account of', 'Paid in Bank', 'Bank Name', 'bank_name'
+    ]) || '';
+    
+    // Extract just the JC number (remove panchayat name if present)
+    const jobCardNo = extractJobCardNo(rawJobCardNo);
     
     if (!jobCardNo || !applicantName) {
       result.failed++;
