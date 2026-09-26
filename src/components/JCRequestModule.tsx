@@ -88,11 +88,18 @@ export default function JCRequestModule({ village, username, userRole }: JCReque
     // Build remarks with additional details
     let fullRemarks = newReq.remarks;
     if (newReq.requestType === 'Add New JC' || newReq.requestType === 'Correction') {
+      // Convert DOB from YYYY-MM-DD to DD-MM-YYYY format
+      let formattedDOB = '';
+      if (newReq.dateOfBirth) {
+        const [year, month, day] = newReq.dateOfBirth.split('-');
+        formattedDOB = `${day}-${month}-${year}`;
+      }
+      
       const details = [
         newReq.aadhaarNumber && `Aadhaar: ${newReq.aadhaarNumber}`,
         newReq.bankName && `Bank: ${newReq.bankName}`,
         newReq.accountNumber && `A/C: ${newReq.accountNumber}`,
-        newReq.dateOfBirth && `DOB: ${newReq.dateOfBirth}`,
+        formattedDOB && `DOB: ${formattedDOB}`,
       ].filter(Boolean).join(' | ');
       fullRemarks = fullRemarks ? `${fullRemarks}\n${details}` : details;
     }
