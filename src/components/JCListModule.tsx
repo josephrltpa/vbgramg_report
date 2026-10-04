@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, FileText, CheckCircle2, XCircle, Trash2, Upload } from 'lucide-react';
+import { Plus, Search, FileText, CheckCircle2, XCircle, Trash2, Upload, Download } from 'lucide-react';
 import { JobCard, JCRequest } from '../types';
 import { fetchJobCards, addJobCard, updateJobCardStatus, deleteJobCard, deleteAllJobCards } from '../lib/services';
 import { parseExcelFile, importJobCards, ImportResult } from '../lib/excelImport';
+import * as XLSX from 'xlsx';
 
 interface JCListModuleProps {
   village: string;
@@ -98,6 +99,48 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
   const [togglingStatus, setTogglingStatus] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // Export functions
+  function formatDateForFilename(): string {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    return `${day}-${month}-${year}`;
+  }
+
+  function exportActive() {
+    const activeCards = jobCards.filter(jc => jc.isActive);
+    
+    const exportData = activeCards.map((jc, index) => ({
+      'Sl No': index + 1,
+      'Job Card Number': jc.jobCardNumber,
+      'Head Name': jc.headName,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Active Job Cards');
+    
+    const filename = `JC_List_${village}_${formatDateForFilename()}.xlsx`;
+    XLSX.writeFile(wb, filename);
+  }
+
+  function exportAll() {
+    const exportData = jobCards.map((jc, index) => ({
+      'Sl No': index + 1,
+      'Job Card Number': jc.jobCardNumber,
+      'Head Name': jc.headName,
+      'Status': jc.isActive ? 'Active' : 'Inactive',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'All Job Cards');
+    
+    const filename = `JC_List_${village}_${formatDateForFilename()}.xlsx`;
+    XLSX.writeFile(wb, filename);
+  }
+
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -188,6 +231,24 @@ export default function JCListModule({ village, userRole }: JCListModuleProps) {
         >
           🔄 Reload
         </button>
+        {jobCards.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={exportActive}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              Export Active
+            </button>
+            <button
+              onClick={exportAll}
+              className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium min-h-[44px] active:scale-95"
+            >
+              <Download className="w-4 h-4" />
+              Export All
+            </button>
+          </div>
+        )}
         {userRole === 'computer_assistant' && (
           <div className="flex gap-2 flex-wrap">
             <button
