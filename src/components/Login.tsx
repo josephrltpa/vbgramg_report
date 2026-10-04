@@ -132,17 +132,6 @@ export default function Login({ onLogin }: LoginProps) {
             Login
           </button>
         </form>
-
-        {/* Demo Credentials */}
-        <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-          <p className="text-xs font-semibold text-gray-700 mb-2">Login Credentials:</p>
-          <div className="space-y-1 text-xs text-gray-600">
-            <p><strong>Computer Assistant:</strong> admin / admin123</p>
-            <p className="mt-2 font-semibold">VEC Secretaries (password: vec123):</p>
-            <p className="font-mono text-[10px]">buhban, darlawng, phulmawi, seling...</p>
-            <p className="text-[10px] text-gray-500">(username = village name in lowercase)</p>
-          </div>
-        </div>
       </div>
     </div>
   );
