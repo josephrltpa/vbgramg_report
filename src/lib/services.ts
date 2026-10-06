@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { JobCard, JCRequest, MonthlyDemand, RequestStatus, CreditStatus, District, Block, Village, FTOReport } from '../types';
+import { JobCard, JCRequest, MonthlyDemand, RequestStatus, CreditStatus, District, Block, Village, FTOReport, DemandListFile } from '../types';
 
 // ============================================================================
 // LOCATIONS (Districts, Blocks, Villages)
@@ -679,6 +679,135 @@ export async function deleteAllFTOReports(village: string, month?: number, year?
   
   if (error) {
     console.error('Error deleting all FTO reports:', error);
+    return false;
+  }
+  
+  return true;
+}
+
+// ============================================================================
+// DEMAND LIST FILES (VEC uploads, Admin downloads)
+// ============================================================================
+export async function fetchDemandListFile(
+  village: string,
+  month: number,
+  year: number
+): Promise<DemandListFile | null> {
+  const { data, error } = await supabase
+    .from('demand_list_files')
+    .select('*')
+    .eq('village', village)
+    .eq('month', month)
+    .eq('year', year)
+    .single();
+  
+  if (error) {
+    if (error.code === 'PGRST116') {
+      // No record found
+      return null;
+    }
+    console.error('Error fetching demand list file:', error);
+    return null;
+  }
+  
+  return {
+    id: data.id,
+    village: data.village,
+    month: data.month,
+    year: data.year,
+    fileLink: data.file_link,
+    fileName: data.file_name,
+    uploadedBy: data.uploaded_by,
+    createdAt: data.created_at,
+  };
+}
+
+export async function uploadDemandListFile(
+  village: string,
+  month: number,
+  year: number,
+  fileLink: string,
+  fileName: string,
+  uploadedBy: string
+): Promise<DemandListFile | null> {
+  // First check if a record exists
+  const existing = await fetchDemandListFile(village, month, year);
+  
+  if (existing) {
+    // Update existing record
+    const { data, error } = await supabase
+      .from('demand_list_files')
+      .update({
+        file_link: fileLink,
+        file_name: fileName,
+        uploaded_by: uploadedBy,
+      })
+      .eq('id', existing.id)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error updating demand list file:', error);
+      return null;
+    }
+    
+    return {
+      id: data.id,
+      village: data.village,
+      month: data.month,
+      year: data.year,
+      fileLink: data.file_link,
+      fileName: data.file_name,
+      uploadedBy: data.uploaded_by,
+      createdAt: data.created_at,
+    };
+  } else {
+    // Insert new record
+    const { data, error } = await supabase
+      .from('demand_list_files')
+      .insert({
+        village: village,
+        month: month,
+        year: year,
+        file_link: fileLink,
+        file_name: fileName,
+        uploaded_by: uploadedBy,
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('Error inserting demand list file:', error);
+      return null;
+    }
+    
+    return {
+      id: data.id,
+      village: data.village,
+      month: data.month,
+      year: data.year,
+      fileLink: data.file_link,
+      fileName: data.file_name,
+      uploadedBy: data.uploaded_by,
+      createdAt: data.created_at,
+    };
+  }
+}
+
+export async function deleteDemandListFile(
+  village: string,
+  month: number,
+  year: number
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('demand_list_files')
+    .delete()
+    .eq('village', village)
+    .eq('month', month)
+    .eq('year', year);
+  
+  if (error) {
+    console.error('Error deleting demand list file:', error);
     return false;
   }
   

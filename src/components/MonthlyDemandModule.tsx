@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { Plus, Search, FileText, Check, X, Upload, Download, Link2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
-import { JobCard, MonthlyDemand, MONTHS, CreditStatus } from '../types';
-import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, updateDemandDetails, bulkUpdateDemandDetails, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, deleteVillageWagelist, VillageWagelist } from '../lib/services';
-import { uploadWagelistFile, deleteWagelistFile, viewHtmlFile, downloadFile } from '../lib/storage';
+import { JobCard, MonthlyDemand, MONTHS, CreditStatus, DemandListFile } from '../types';
+import { fetchJobCards, fetchMonthlyDemands, addMonthlyDemand, updateDemandCreditStatus, updateDemandDetails, bulkUpdateDemandDetails, deleteMonthlyDemand, fetchVillageWagelist, uploadVillageWagelist, deleteVillageWagelist, VillageWagelist, fetchDemandListFile, uploadDemandListFile, deleteDemandListFile } from '../lib/services';
+import { uploadWagelistFile, deleteWagelistFile, viewHtmlFile, downloadFile, uploadDemandListFile as uploadDemandListFileToStorage, deleteDemandListFile as deleteDemandListFileFromStorage } from '../lib/storage';
 import { parseExcelFile, importMonthlyDemands, ImportResult } from '../lib/excelImport';
 
 interface MonthlyDemandModuleProps {
@@ -37,6 +37,9 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
   const [bulkDays, setBulkDays] = useState<string>('');
   const [bulkAmount, setBulkAmount] = useState<string>('');
   const [bulkUpdating, setBulkUpdating] = useState(false);
+  const [demandListFile, setDemandListFile] = useState<DemandListFile | null>(null);
+  const [uploadingDemandList, setUploadingDemandList] = useState(false);
+  const demandListInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadData();
@@ -44,14 +47,16 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
 
   async function loadData() {
     setLoading(true);
-    const [jcs, dems, wagelist] = await Promise.all([
+    const [jcs, dems, wagelist, demandList] = await Promise.all([
       fetchJobCards(village),
       fetchMonthlyDemands(village, selectedMonth, selectedYear),
       fetchVillageWagelist(village, selectedMonth, selectedYear),
+      fetchDemandListFile(village, selectedMonth, selectedYear),
     ]);
     setJobCards(jcs);
     setDemands(dems);
     setVillageWagelist(wagelist);
+    setDemandListFile(demandList);
     setCurrentPage(1);
     setLoading(false);
   }
@@ -251,6 +256,93 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
     setUploadingWagelist(false);
   }
 
+  async function handleUploadDemandList(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setUploadingDemandList(true);
+    
+    try {
+      // Upload file to storage
+      const fileUrl = await uploadDemandListFileToStorage(
+        file,
+        village,
+        selectedMonth,
+        selectedYear
+      );
+      
+      if (fileUrl) {
+        // If there's an existing file, delete the old one
+        if (demandListFile?.fileLink) {
+          await deleteDemandListFileFromStorage(demandListFile.fileLink);
+        }
+        
+        // Save the new file URL to database
+        const result = await uploadDemandListFile(
+          village,
+          selectedMonth,
+          selectedYear,
+          fileUrl,
+          file.name,
+          userRole === 'computer_assistant' ? 'admin' : village
+        );
+        
+        if (result) {
+          setDemandListFile(result);
+          if (demandListInputRef.current) {
+            demandListInputRef.current.value = '';
+          }
+          alert('Demand list uploaded successfully!');
+        } else {
+          alert('Failed to save demand list information. Please try again.');
+        }
+      } else {
+        alert('Failed to upload file. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error uploading demand list:', error);
+      alert('An error occurred while uploading. Please try again.');
+    }
+    
+    setUploadingDemandList(false);
+  }
+
+  async function handleDeleteDemandList() {
+    if (!demandListFile) return;
+    
+    if (!window.confirm('Are you sure you want to delete this demand list? This action cannot be undone.')) {
+      return;
+    }
+    
+    setUploadingDemandList(true);
+    
+    try {
+      // Delete file from storage
+      if (demandListFile.fileLink) {
+        await deleteDemandListFileFromStorage(demandListFile.fileLink);
+      }
+      
+      // Delete record from database
+      const success = await deleteDemandListFile(
+        village,
+        selectedMonth,
+        selectedYear
+      );
+      
+      if (success) {
+        setDemandListFile(null);
+        alert('Demand list deleted successfully');
+      } else {
+        alert('Failed to delete demand list. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting demand list:', error);
+      alert('An error occurred while deleting. Please try again.');
+    }
+    
+    setUploadingDemandList(false);
+  }
+
   async function handleImportExcel(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -402,6 +494,113 @@ export default function MonthlyDemandModule({ village, userRole }: MonthlyDemand
           <p className="text-xs text-amber-600">Pending</p>
           <p className="text-xl font-bold text-amber-900">{pendingCount}</p>
         </div>
+      </div>
+
+      {/* Demand List Section */}
+      <div className="bg-white rounded-xl border border-gray-100 p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">Demand List</h3>
+            <p className="text-xs text-gray-500">
+              {MONTHS.find(m => m.index === selectedMonth)?.fullLabel} {selectedYear} • {village}
+            </p>
+          </div>
+          {demandListFile && userRole === 'computer_assistant' && (
+            <button
+              onClick={() => {
+                downloadFile(demandListFile.fileLink, demandListFile.fileName);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Download Demand List
+            </button>
+          )}
+        </div>
+        
+        {/* VEC Upload Section */}
+        {userRole === 'secretary' && (
+          <div className="space-y-3">
+            {demandListFile && (
+              <div className="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-600" />
+                  <div>
+                    <p className="text-sm font-medium text-indigo-900">Demand list uploaded</p>
+                    <p className="text-xs text-indigo-700">
+                      {demandListFile.fileName} • Uploaded on {new Date(demandListFile.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleDeleteDemandList}
+                  disabled={uploadingDemandList}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploadingDemandList ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+            
+            <div className="flex gap-2">
+              <input
+                ref={demandListInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleUploadDemandList}
+                disabled={uploadingDemandList}
+                className="flex-1 text-sm border border-gray-200 rounded-lg px-3 py-2 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+              {uploadingDemandList && (
+                <div className="flex items-center gap-2 text-sm text-indigo-600">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                  </svg>
+                  Uploading...
+                </div>
+              )}
+            </div>
+            
+            {!demandListFile && (
+              <p className="text-xs text-gray-500">
+                Upload the demand list Excel file for this month. Admin will review and create demands based on this list.
+              </p>
+            )}
+          </div>
+        )}
+        
+        {/* Admin View - Show uploaded file info */}
+        {userRole === 'computer_assistant' && demandListFile && (
+          <div className="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-indigo-600" />
+              <div>
+                <p className="text-sm font-medium text-indigo-900">Demand list from VEC</p>
+                <p className="text-xs text-indigo-700">
+                  {demandListFile.fileName} • Uploaded on {new Date(demandListFile.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {userRole === 'computer_assistant' && !demandListFile && (
+          <p className="text-xs text-gray-400 italic">No demand list uploaded by VEC for this month</p>
+        )}
       </div>
 
       {/* Village Wagelist Section */}
