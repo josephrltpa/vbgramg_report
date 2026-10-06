@@ -69,6 +69,17 @@ export interface MonthlyDemand {
   createdAt: string;
 }
 
+export interface DemandListFile {
+  id: string;
+  village: string;
+  month: number;
+  year: number;
+  fileLink: string;
+  fileName: string;
+  uploadedBy: string;
+  createdAt: string;
+}
+
 export interface FTOReport {
   id: string;
   jobCardNo: string;

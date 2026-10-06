@@ -151,3 +151,90 @@ export function downloadFile(fileUrl: string, fileName: string) {
       alert('Failed to download file. Please try again.');
     });
 }
+
+/**
+ * Upload a demand list file to Supabase Storage
+ * @param file - The file to upload
+ * @param village - Village name
+ * @param month - Month number (1-12)
+ * @param year - Year
+ * @returns The public URL of the uploaded file
+ */
+export async function uploadDemandListFile(
+  file: File,
+  village: string,
+  month: number,
+  year: number
+): Promise<string | null> {
+  try {
+    console.log('Starting demand list file upload...', { file: file.name, size: file.size, village, month, year });
+    
+    // Create a unique file path
+    const fileExt = file.name.split('.').pop();
+    const fileName = `demand_list_${village}_${year}_${month}_${Date.now()}.${fileExt}`;
+    const filePath = `demand_lists/${village}/${year}/${month}/${fileName}`;
+
+    console.log('Uploading to path:', filePath);
+
+    // Upload to Supabase Storage
+    const { data, error: uploadError } = await supabase.storage
+      .from('wagelists')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true
+      });
+
+    if (uploadError) {
+      console.error('Error uploading demand list file:', uploadError);
+      return null;
+    }
+
+    console.log('Demand list upload successful:', data);
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('wagelists')
+      .getPublicUrl(filePath);
+
+    console.log('Public URL:', urlData.publicUrl);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('Error in uploadDemandListFile:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete a demand list file from Supabase Storage
+ * @param fileUrl - The public URL of the file to delete
+ */
+export async function deleteDemandListFile(fileUrl: string): Promise<boolean> {
+  try {
+    console.log('Deleting demand list file:', fileUrl);
+    
+    // Extract file path from URL
+    const urlParts = fileUrl.split('/storage/v1/object/public/wagelists/');
+    if (urlParts.length < 2) {
+      console.error('Invalid file URL format');
+      return false;
+    }
+
+    const filePath = urlParts[1];
+    console.log('File path to delete:', filePath);
+
+    const { data, error } = await supabase.storage
+      .from('wagelists')
+      .remove([filePath]);
+
+    if (error) {
+      console.error('Error deleting demand list file:', error);
+      return false;
+    }
+
+    console.log('Demand list file deleted successfully:', data);
+    return true;
+  } catch (error) {
+    console.error('Error in deleteDemandListFile:', error);
+    return false;
+  }
+}
